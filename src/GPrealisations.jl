@@ -5,82 +5,84 @@ import GaussianProcesses: num_params, set_params!, get_params
 import GaussianProcesses: update_mll_and_dmll!, update_mll!
 using NLopt
 
+const GPvec = Vector{GPE}
+
 type GPRealisations
-    reals::Vector{GPE}
+    gpvec::GPvec
     k::Kernel
     logNoise::Float64
     mll::Float64
     dmll::Vector{Float64}
 end
 
-function GPRealisations(reals::Vector{GPE})
-    first = reals[1]
-    gpr = GPRealisations(reals, first.k, first.logNoise, NaN, [])
+function GPRealisations(gpvec::GPvec)
+    first = gpvec[1]
+    gpgpvec = GPRealisations(gpvec, first.k, first.logNoise, NaN, [])
 end
 
-function get_params(gpr::GPRealisations; 
+function get_params(gpgpvec::GPRealisations; 
                     noise::Bool=true, mean::Bool=true, kern::Bool=true)
     params = Float64[]
-    if noise; push!(params, gpr.logNoise); end
+    if noise; push!(params, gpgpvec.logNoise); end
     if mean
-        for gp in gpr.reals
+        for gp in gpgpvec.gpvec
             append!(params, get_params(gp.m))
         end
     end
-    if kern; append!(params, get_params(gpr.k)); end
+    if kern; append!(params, get_params(gpgpvec.k)); end
     return params
 end
-function propagate_params!(gpr::GPRealisations; noise::Bool=true, kern::Bool=true)
-    for gp in gpr.reals
+function propagate_params!(gpgpvec::GPRealisations; noise::Bool=true, kern::Bool=true)
+    for gp in gpgpvec.gpvec
         # harmonize parameters
         if kern
-            gp.k = gpr.k
+            gp.k = gpgpvec.k
         end
         if noise
-            gp.logNoise = gpr.logNoise
+            gp.logNoise = gpgpvec.logNoise
         end
     end
 end
-function set_params!(gpr::GPRealisations, hyp::Vector{Float64}; 
+function set_params!(gpgpvec::GPRealisations, hyp::Vector{Float64}; 
                      noise::Bool=true, mean::Bool=true, kern::Bool=true)
     # println("mean=$(mean)")
     istart=1
     if noise
-        gpr.logNoise = hyp[istart]
+        gpgpvec.logNoise = hyp[istart]
         istart += 1
     end
     if mean
-        for gp in gpr.reals
+        for gp in gpgpvec.gpvec
             set_params!(gp.m, hyp[istart:istart+num_params(gp.m)-1])
             istart += num_params(gp.m)
         end
     end
     if kern
-        set_params!(gpr.k, hyp[istart:end])
+        set_params!(gpgpvec.k, hyp[istart:end])
     end
-    propagate_params!(gpr, noise=noise, kern=kern)
+    propagate_params!(gpgpvec, noise=noise, kern=kern)
 end
 
-function update_mll!(gpr::GPRealisations)
+function update_mll!(gpgpvec::GPRealisations)
     mll = 0.0
-    for gp in gpr.reals
+    for gp in gpgpvec.gpvec
         update_mll!(gp)
         mll += gp.mll
     end
-    gpr.mll = mll
+    gpgpvec.mll = mll
     return mll
 end
-function update_mll_and_dmll!(gpr::GPRealisations, 
+function update_mll_and_dmll!(gpgpvec::GPRealisations, 
                               Kgrads::Dict{Int,Matrix}, ααinvcKIs::Dict{Int,Matrix}; 
                               noise::Bool=true, mean::Bool=true, kern::Bool=true)
-    gpr.mll = 0.0
-    gpr.dmll = zeros(get_params(gpr; noise=noise, mean=mean, kern=kern))
+    gpgpvec.mll = 0.0
+    gpgpvec.dmll = zeros(get_params(gpgpvec; noise=noise, mean=mean, kern=kern))
     imean=2
-    ikern=collect((length(gpr.dmll)-num_params(gpr.k)+1):length(gpr.dmll))
-    for gp in gpr.reals
+    ikern=collect((length(gpgpvec.dmll)-num_params(gpgpvec.k)+1):length(gpgpvec.dmll))
+    for gp in gpgpvec.gpvec
         update_mll_and_dmll!(gp, Kgrads[gp.nobsv], ααinvcKIs[gp.nobsv]; 
             noise=noise,mean=mean,kern=kern)
-        gpr.mll += gp.mll
+        gpgpvec.mll += gp.mll
         dmll_indices=Int[]
         if noise
             push!(dmll_indices, 1)
@@ -92,28 +94,28 @@ function update_mll_and_dmll!(gpr::GPRealisations,
         if kern
             append!(dmll_indices, ikern)
         end
-        gpr.dmll[dmll_indices] .+= gp.dmll
+        gpgpvec.dmll[dmll_indices] .+= gp.dmll
     end
-    return gpr.dmll
+    return gpgpvec.dmll
 end
-function update_mll_and_dmll!(gpr::GPRealisations; kwargs...)
+function update_mll_and_dmll!(gpgpvec::GPRealisations; kwargs...)
     Kgrads = Dict{Int,Matrix}()
     ααinvcKIs = Dict{Int,Matrix}()
-    for gp in gpr.reals
+    for gp in gpgpvec.gpvec
         if haskey(Kgrads, gp.nobsv)
             continue
         end
         Kgrads[gp.nobsv] = Array{Float64}(gp.nobsv, gp.nobsv)
         ααinvcKIs[gp.nobsv] = Array{Float64}(gp.nobsv, gp.nobsv)
     end
-    return update_mll_and_dmll!(gpr, Kgrads, ααinvcKIs)
+    return update_mll_and_dmll!(gpgpvec, Kgrads, ααinvcKIs)
 end
 
-function get_optim_target(gpr::GPRealisations;
+function get_optim_target(gpgpvec::GPRealisations;
                           noise::Bool=true, mean::Bool=true, kern::Bool=true)
     Kgrads = Dict{Int,Matrix}()
     ααinvcKIs = Dict{Int,Matrix}()
-    for gp in gpr.reals
+    for gp in gpgpvec.gpvec
         if haskey(Kgrads, gp.nobsv)
             continue
         end
@@ -122,9 +124,9 @@ function get_optim_target(gpr::GPRealisations;
     end
     function mll(hyp::Vector{Float64})
         try
-            set_params!(gpr, hyp; noise=noise, mean=mean, kern=kern)
-            update_mll!(gpr)
-            return -gpr.mll
+            set_params!(gpgpvec, hyp; noise=noise, mean=mean, kern=kern)
+            update_mll!(gpgpvec)
+            return -gpgpvec.mll
         catch err
              if !all(isfinite(hyp))
                 println(err)
@@ -143,10 +145,10 @@ function get_optim_target(gpr::GPRealisations;
 
     function mll_and_dmll!(grad::Vector{Float64}, hyp::Vector{Float64})
         #=try=#
-            set_params!(gpr, hyp; noise=noise, mean=mean, kern=kern)
-            update_mll_and_dmll!(gpr, Kgrads, ααinvcKIs; noise=noise, mean=mean, kern=kern)
-            grad[:] = -gpr.dmll
-            return -gpr.mll
+            set_params!(gpgpvec, hyp; noise=noise, mean=mean, kern=kern)
+            update_mll_and_dmll!(gpgpvec, Kgrads, ααinvcKIs; noise=noise, mean=mean, kern=kern)
+            grad[:] = -gpgpvec.dmll
+            return -gpgpvec.mll
         #=catch err=#
         #=     if !all(isfinite(hyp))=#
         #=        println(err)=#
@@ -167,22 +169,22 @@ function get_optim_target(gpr::GPRealisations;
     end
 
     func = OnceDifferentiable(mll, dmll!, mll_and_dmll!,
-        get_params(gpr;noise=noise,mean=mean,kern=kern))
+        get_params(gpgpvec;noise=noise,mean=mean,kern=kern))
     return func
 end
-#=function optimize!(gpr::GPRealisations; noise::Bool=true, mean::Bool=true, kern::Bool=true,=#
+#=function optimize!(gpgpvec::GPRealisations; noise::Bool=true, mean::Bool=true, kern::Bool=true,=#
 #=                    method=ConjugateGradient(), kwargs...)=#
-#=    func = get_optim_target(gpr, noise=noise, mean=mean, kern=kern)=#
-#=    init = get_params(gpr;  noise=noise, mean=mean, kern=kern)  # Initial hyperparameter values=#
+#=    func = get_optim_target(gpgpvec, noise=noise, mean=mean, kern=kern)=#
+#=    init = get_params(gpgpvec;  noise=noise, mean=mean, kern=kern)  # Initial hyperparameter values=#
 #=    results=optimize(func,init; method=method, kwargs...)                     # Run optimizer=#
-#=    set_params!(gpr, Optim.minimizer(results), noise=noise,mean=mean,kern=kern)=#
-#=    update_mll!(gpr)=#
+#=    set_params!(gpgpvec, Optim.minimizer(results), noise=noise,mean=mean,kern=kern)=#
+#=    update_mll!(gpgpvec)=#
 #=    return results=#
 #=end=#
-function optimize!(gpr::GPRealisations;
+function optimize!(gpgpvec::GPRealisations;
                    noise::Bool=true, mean::Bool=true, kern::Bool=true)
-    func = get_optim_target(gpr, noise=noise, mean=mean, kern=kern)
-    init = get_params(gpr;  noise=noise, mean=mean, kern=kern)  # Initial hyperparameter values
+    func = get_optim_target(gpgpvec, noise=noise, mean=mean, kern=kern)
+    init = get_params(gpgpvec;  noise=noise, mean=mean, kern=kern)  # Initial hyperparameter values
     nparams = length(init)
     lower = -Inf*ones(nparams)
     upper = Inf*ones(nparams)
@@ -191,7 +193,7 @@ function optimize!(gpr::GPRealisations;
         ikernstart+=1
         lower[1]=-10.0
     end
-    upper[ikernstart:ikernstart+num_params(gpr.k)-1]=20.0
+    upper[ikernstart:ikernstart+num_params(gpgpvec.k)-1]=20.0
     best_x = copy(init)
     best_y = Inf
     count = 0
