@@ -6,13 +6,12 @@ function chistat(gpT::GPE, gpC::GPE, Xb::MatF64)
     return dot(μ, Σ \ μ)
 end
 function chistat(gpT::GPE, gpC::GPE, Xb::MatF64, 
-                                     Σcliff::PDMat, cK_T::MatF64, cK_C::MatF64)
+                 Σcliff::PDMat, cK_T::MatF64, cK_C::MatF64)
     μT = predict_mu(gpT, Xb, cK_T)
     μC = predict_mu(gpC, Xb, cK_C)
     μ = μT - μC
     return dot(μ, Σcliff \ μ)
 end
-
 
 function sim_chi_null!(
         gpT::GPE, gpC::GPE, gpNull::GPE, 

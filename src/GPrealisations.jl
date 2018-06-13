@@ -144,25 +144,10 @@ function get_optim_target(gpgpvec::GPRealisations;
     end
 
     function mll_and_dmll!(grad::Vector{Float64}, hyp::Vector{Float64})
-        #=try=#
-            set_params!(gpgpvec, hyp; noise=noise, mean=mean, kern=kern)
-            update_mll_and_dmll!(gpgpvec, Kgrads, ααinvcKIs; noise=noise, mean=mean, kern=kern)
-            grad[:] = -gpgpvec.dmll
-            return -gpgpvec.mll
-        #=catch err=#
-        #=     if !all(isfinite(hyp))=#
-        #=        println(err)=#
-        #=        return Inf=#
-        #=    elseif isa(err, ArgumentError)=#
-        #=        println(err)=#
-        #=        return Inf=#
-        #=    elseif isa(err, Base.LinAlg.PosDefException)=#
-        #=        println(err)=#
-        #=        return Inf=#
-        #=    else=#
-        #=        throw(err)=#
-        #=    end=#
-        #=end =#
+        set_params!(gpgpvec, hyp; noise=noise, mean=mean, kern=kern)
+        update_mll_and_dmll!(gpgpvec, Kgrads, ααinvcKIs; noise=noise, mean=mean, kern=kern)
+        grad[:] = -gpgpvec.dmll
+        return -gpgpvec.mll
     end
     function dmll!(grad::Vector{Float64}, hyp::Vector{Float64})
         mll_and_dmll!(grad, hyp)
@@ -172,15 +157,6 @@ function get_optim_target(gpgpvec::GPRealisations;
         get_params(gpgpvec;noise=noise,mean=mean,kern=kern))
     return func
 end
-#=function optimize!(gpgpvec::GPRealisations; noise::Bool=true, mean::Bool=true, kern::Bool=true,=#
-#=                    method=ConjugateGradient(), kwargs...)=#
-#=    func = get_optim_target(gpgpvec, noise=noise, mean=mean, kern=kern)=#
-#=    init = get_params(gpgpvec;  noise=noise, mean=mean, kern=kern)  # Initial hyperparameter values=#
-#=    results=optimize(func,init; method=method, kwargs...)                     # Run optimizer=#
-#=    set_params!(gpgpvec, Optim.minimizer(results), noise=noise,mean=mean,kern=kern)=#
-#=    update_mll!(gpgpvec)=#
-#=    return results=#
-#=end=#
 function optimize!(gpgpvec::GPRealisations;
                    noise::Bool=true, mean::Bool=true, kern::Bool=true)
     func = get_optim_target(gpgpvec, noise=noise, mean=mean, kern=kern)
@@ -225,25 +201,7 @@ function optimize!(gpgpvec::GPRealisations;
     xtol_rel!(opt,1e-4)
     ftol_rel!(opt, 1e-20)
 
-    # try
     (minf,minx,ret) = NLopt.optimize(opt, init)
-    # catch
-        # try
-            # # LD_MMA seems to be slower
-            # # but maybe more reliable
-            # println("trying LD_MMA")
-            # opt = Opt(:LD_MMA, nparams)
-            # lower_bounds!(opt, lower)
-            # upper_bounds!(opt, upper)
-            # min_objective!(opt, myfunc)
-            # xtol_rel!(opt, 1e-4)
-            # ftol_rel!(opt, 1e-8)
-            # (minf,minx,ret) = NLopt.optimize(opt, init)
-        # catch
-            # _ = myfunc(best_x, [])
-            # return best_x, count
-        # end
-    # end
-    _ = myfunc(best_x, [])
+    myfunc(best_x, [])
     return best_x, count
 end
