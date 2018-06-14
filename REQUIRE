@@ -3,3 +3,5 @@ GaussianProcesses
 PDMats
 Optim
 NLopt
+LibGEOS
+GeoInterface
