@@ -2,11 +2,11 @@ import GeoInterface: coordinates, xcoord, ycoord
 import LibGEOS
 import IterTools
 import DataStructures
-import LibGEOS: nearestPoints, interpolate, distance
-import LibGEOS: MultiPolygon, envelope
+using LibGEOS: nearestPoints, interpolate, distance
+using LibGEOS: MultiPolygon, envelope
 import GaussianProcesses: GPE
 
-function projection_points(gp::GPE, border::BorderType; maxdist::Float64=Inf)
+function projection_points(gp::GPE, border::B; maxdist::Float64=Inf) where {B<:BorderType}
     X∂ = Array{Float64}(2, gp.nobsv)
     distances = Vector{Float64}(gp.nobsv)
     for i in 1:gp.nobsv
@@ -26,7 +26,7 @@ function projection_points(gp::GPE, border::BorderType; maxdist::Float64=Inf)
     return X∂[:, distances .<= maxdist]
 end
 
-function proj_estimator(gpT::GPE, gpC::GPE, border::BorderType; maxdist::Float64=Inf)
+function proj_estimator(gpT::GPE, gpC::GPE, border::B; maxdist::Float64=Inf) where {B<:BorderType}
     X∂_treat = projection_points(gpT, border; maxdist=maxdist)
     X∂_ctrol = projection_points(gpC, border; maxdist=maxdist)
     X∂ = [X∂_treat X∂_ctrol]
@@ -45,10 +45,10 @@ function data_hull(gpT::GPE, gpC::GPE)
     return hull
 end
 
-function infinite_proj_sentinels(gpT::GPE, gpC::GPE, border::BorderType,
+function infinite_proj_sentinels(gpT::GPE, gpC::GPE, border::B,
                                     region::MultiPolygon,
                                     maxdist::Float64, gridspace::Float64;
-                                    density = ((s1,s2) -> 1.0))
+                                    density = ((s1,s2) -> 1.0)) where {B<:BorderType}
     # Add a buffer around the border, returns a "border area".
     #=buffer_polygon = LibGEOS.buffer(border, buffer)=#
 
@@ -103,10 +103,10 @@ function infinite_proj_sentinels(gpT::GPE, gpC::GPE, border::BorderType,
     return X∂_projected, weights
 end
 
-function infinite_proj_estim(gpT::GPE, gpC::GPE, border::BorderType,
+function infinite_proj_estim(gpT::GPE, gpC::GPE, border::B,
                                     region::MultiPolygon,
                                     maxdist::Float64, gridspace::Float64;
-                                    density = ((s1,s2) -> 1.0))
+                                    density = ((s1,s2) -> 1.0)) where {B<:BorderType}
     X∂_projected, weights = infinite_proj_sentinels(
             gpT, gpC, border, region, maxdist, gridspace; density=density
             )
