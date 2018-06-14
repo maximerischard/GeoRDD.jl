@@ -2,6 +2,8 @@ module GeoRDD
     using GaussianProcesses
     using PDMats
     using Optim
+    import GeoInterface
+    import LibGEOS
     # utilities
     include("gp_utils.jl")
     include("geometry.jl")
@@ -13,6 +15,7 @@ module GeoRDD
     # Local average treatment effect estimation
     include("border_projection.jl")
     include("average_treatment_effect.jl")
+    include("weight_at_units.jl")
     # Hypothesis testing
     include("hypotest_chi2.jl")
     include("hypotest_invvar.jl")
