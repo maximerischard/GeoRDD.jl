@@ -1,7 +1,10 @@
 julia 0.6
-GaussianProcesses
+GaussianProcesses 0.6.0
 PDMats
 Optim
 NLopt
 LibGEOS
 GeoInterface
+Combinatorics
+DataFrames
+StatsModels 0.2.5
