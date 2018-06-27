@@ -1,132 +1,161 @@
-using Optim
-using GaussianProcesses: Mean, Kernel, evaluate, metric
-import GaussianProcesses: optimize!, get_optim_target
-import GaussianProcesses: num_params, set_params!, get_params
-import GaussianProcesses: update_mll_and_dmll!, update_mll!
-using NLopt
-
-const GPvec = Vector{GPE}
-
-type GPRealisations
-    gpvec::GPvec
-    k::Kernel
+type GPRealisations{KEY}
+    groupKeys::Vector{KEY}
+    mgp::Dict{KEY,GPE}
+    nobsv::Int
     logNoise::Float64
-    mll::Float64
-    dmll::Vector{Float64}
+    m::Mean
+    k::Kernel
+    mll::Float64            # Marginal log-likelihood
+    dmll::Vector{Float64}   # Gradient marginal log-likelihood
+    function GPRealisations{KEY}(
+            groupKeys::Vector{KEY},
+            mgp::Dict{KEY,GPE}, 
+            nobsv::Int,
+            logNoise::Float64,
+            m::Mean,
+            k::Kernel,
+            ) where {KEY}
+        length(groupKeys) == length(mgp) || throw("groupKeys and mgp should have same length")
+        gpreals = new(groupKeys, mgp, nobsv, logNoise, m, k)
+        propagate_params!(gpreals)
+        update_mll!(gpreals)
+        return gpreals
+    end
+end
+function GPRealisations(gpList::Vector{GPE}, groupKeys::Vector{KEY}) where {KEY}
+    total_nobsv = sum([gp.nobsv for gp in gpList])
+    # get kernel and parameters from first GP in list
+    first_gp = gpList[1]
+    dim = first_gp.dim
+    logNoise = first_gp.logNoise
+    kern = first_gp.k
+    m = first_gp.m
+    ngroups = length(groupKeys)
+    @assert ngroups == length(gpList)
+    gpDict = Dict{KEY, GPE}()
+    istart = 1
+    for j in 1:ngroups
+        gp = gpList[j]
+        key = groupKeys[j]
+        nobsv = gp.nobsv
+        gp.nobsv > 0 || throw("empty group")
+        gpDict[key] = gp
+        istart += nobsv
+    end
+    gpreals = GPRealisations{KEY}(
+                groupKeys, gpDict, 
+                total_nobsv, logNoise, m, kern)
+    return gpreals
 end
 
-function GPRealisations(gpvec::GPvec)
-    first = gpvec[1]
-    gpgpvec = GPRealisations(gpvec, first.k, first.logNoise, NaN, [])
-end
+getindex(gpreals::GPRealisations{KEY}, key::KEY) where {KEY} = gpreals.mgp[key]
+keys(gpreals::GPRealisations) = gpreals.groupKeys
+values(gpreals::GPRealisations) = values(gpreals.mgp)
 
-function get_params(gpgpvec::GPRealisations; 
-                    noise::Bool=true, mean::Bool=true, kern::Bool=true)
+function get_params(gpreals::GPRealisations; 
+                    noise::Bool=true, domean::Bool=true, kern::Bool=true)
     params = Float64[]
-    if noise; push!(params, gpgpvec.logNoise); end
-    if mean
-        for gp in gpgpvec.gpvec
+    if noise; push!(params, gpreals.logNoise); end
+    if domean
+        for gp in values(gpreals.mgp)
             append!(params, get_params(gp.m))
         end
     end
-    if kern; append!(params, get_params(gpgpvec.k)); end
+    if kern; append!(params, get_params(gpreals.k)); end
     return params
 end
-function propagate_params!(gpgpvec::GPRealisations; noise::Bool=true, kern::Bool=true)
-    for gp in gpgpvec.gpvec
+function propagate_params!(gpreals::GPRealisations; noise::Bool=true, kern::Bool=true)
+    for gp in values(gpreals.mgp)
         # harmonize parameters
         if kern
-            gp.k = gpgpvec.k
+            gp.k = gpreals.k
         end
         if noise
-            gp.logNoise = gpgpvec.logNoise
+            gp.logNoise = gpreals.logNoise
         end
     end
 end
-function set_params!(gpgpvec::GPRealisations, hyp::Vector{Float64}; 
-                     noise::Bool=true, mean::Bool=true, kern::Bool=true)
+function set_params!(gpreals::GPRealisations, hyp::Vector{Float64}; 
+                     noise::Bool=true, domean::Bool=true, kern::Bool=true)
     # println("mean=$(mean)")
     istart=1
     if noise
-        gpgpvec.logNoise = hyp[istart]
+        gpreals.logNoise = hyp[istart]
         istart += 1
     end
-    if mean
-        for gp in gpgpvec.gpvec
+    if domean
+        for key in gpreals.groupKeys
+            gp = gpreals.mgp[key]
             set_params!(gp.m, hyp[istart:istart+num_params(gp.m)-1])
             istart += num_params(gp.m)
         end
     end
     if kern
-        set_params!(gpgpvec.k, hyp[istart:end])
+        set_params!(gpreals.k, hyp[istart:end])
     end
-    propagate_params!(gpgpvec, noise=noise, kern=kern)
+    propagate_params!(gpreals, noise=noise, kern=kern)
 end
 
-function update_mll!(gpgpvec::GPRealisations)
+function update_mll!(gpreals::GPRealisations)
     mll = 0.0
-    for gp in gpgpvec.gpvec
+    for gp in values(gpreals.mgp)
         update_mll!(gp)
         mll += gp.mll
     end
-    gpgpvec.mll = mll
+    gpreals.mll = mll
     return mll
 end
-function update_mll_and_dmll!(gpgpvec::GPRealisations, 
-                              Kgrads::Dict{Int,Matrix}, ααinvcKIs::Dict{Int,Matrix}; 
-                              noise::Bool=true, mean::Bool=true, kern::Bool=true)
-    gpgpvec.mll = 0.0
-    gpgpvec.dmll = zeros(get_params(gpgpvec; noise=noise, mean=mean, kern=kern))
+function update_mll_and_dmll!(gpreals::GPRealisations, 
+                              ααinvcKIs::Dict{Int,Matrix}; 
+                              noise::Bool=true, domean::Bool=true, kern::Bool=true)
+    gpreals.mll = 0.0
+    gpreals.dmll = zeros(get_params(gpreals; noise=noise, domean=domean, kern=kern))
     imean=2
-    ikern=collect((length(gpgpvec.dmll)-num_params(gpgpvec.k)+1):length(gpgpvec.dmll))
-    for gp in gpgpvec.gpvec
-        update_mll_and_dmll!(gp, Kgrads[gp.nobsv], ααinvcKIs[gp.nobsv]; 
-            noise=noise,mean=mean,kern=kern)
-        gpgpvec.mll += gp.mll
+    ikern=collect((length(gpreals.dmll)-num_params(gpreals.k)+1):length(gpreals.dmll))
+    for gp in values(gpreals.mgp)
+        update_mll_and_dmll!(gp, ααinvcKIs[gp.nobsv]; 
+            noise=noise,  domean=domean, kern=kern)
+        gpreals.mll += gp.mll
         dmll_indices=Int[]
         if noise
             push!(dmll_indices, 1)
         end
-        if mean
+        if domean
             append!(dmll_indices, imean:imean+num_params(gp.m)-1)
             imean+=num_params(gp.m)
         end
         if kern
             append!(dmll_indices, ikern)
         end
-        gpgpvec.dmll[dmll_indices] .+= gp.dmll
+        gpreals.dmll[dmll_indices] .+= gp.dmll
     end
-    return gpgpvec.dmll
+    return gpreals.dmll
 end
-function update_mll_and_dmll!(gpgpvec::GPRealisations; kwargs...)
-    Kgrads = Dict{Int,Matrix}()
+function update_mll_and_dmll!(gpreals::GPRealisations; kwargs...)
     ααinvcKIs = Dict{Int,Matrix}()
-    for gp in gpgpvec.gpvec
-        if haskey(Kgrads, gp.nobsv)
+    for gp in values(gpreals.mgp)
+        if haskey(ααinvcKIs, gp.nobsv)
             continue
         end
-        Kgrads[gp.nobsv] = Array{Float64}(gp.nobsv, gp.nobsv)
         ααinvcKIs[gp.nobsv] = Array{Float64}(gp.nobsv, gp.nobsv)
     end
-    return update_mll_and_dmll!(gpgpvec, Kgrads, ααinvcKIs)
+    return update_mll_and_dmll!(gpreals, ααinvcKIs)
 end
 
-function get_optim_target(gpgpvec::GPRealisations;
-                          noise::Bool=true, mean::Bool=true, kern::Bool=true)
-    Kgrads = Dict{Int,Matrix}()
+function get_optim_target(gpreals::GPRealisations;
+                          noise::Bool=true, domean::Bool=true, kern::Bool=true)
     ααinvcKIs = Dict{Int,Matrix}()
-    for gp in gpgpvec.gpvec
-        if haskey(Kgrads, gp.nobsv)
+    for gp in values(gpreals.mgp)
+        if haskey(ααinvcKIs, gp.nobsv)
             continue
         end
-        Kgrads[gp.nobsv] = Array{Float64}(gp.nobsv, gp.nobsv)
         ααinvcKIs[gp.nobsv] = Array{Float64}(gp.nobsv, gp.nobsv)
     end
     function mll(hyp::Vector{Float64})
         try
-            set_params!(gpgpvec, hyp; noise=noise, mean=mean, kern=kern)
-            update_mll!(gpgpvec)
-            return -gpgpvec.mll
+            set_params!(gpreals, hyp; noise=noise, domean=domean, kern=kern)
+            update_mll!(gpreals)
+            return -gpreals.mll
         catch err
              if !all(isfinite(hyp))
                 println(err)
@@ -144,23 +173,23 @@ function get_optim_target(gpgpvec::GPRealisations;
     end
 
     function mll_and_dmll!(grad::Vector{Float64}, hyp::Vector{Float64})
-        set_params!(gpgpvec, hyp; noise=noise, mean=mean, kern=kern)
-        update_mll_and_dmll!(gpgpvec, Kgrads, ααinvcKIs; noise=noise, mean=mean, kern=kern)
-        grad[:] = -gpgpvec.dmll
-        return -gpgpvec.mll
+        set_params!(gpreals, hyp; noise=noise, domean=domean, kern=kern)
+        update_mll_and_dmll!(gpreals, ααinvcKIs; noise=noise, domean=domean, kern=kern)
+        grad[:] = -gpreals.dmll
+        return -gpreals.mll
     end
     function dmll!(grad::Vector{Float64}, hyp::Vector{Float64})
         mll_and_dmll!(grad, hyp)
     end
 
     func = OnceDifferentiable(mll, dmll!, mll_and_dmll!,
-        get_params(gpgpvec;noise=noise,mean=mean,kern=kern))
+        get_params(gpreals;noise=noise,domean=domean,kern=kern))
     return func
 end
-function optimize!(gpgpvec::GPRealisations;
-                   noise::Bool=true, mean::Bool=true, kern::Bool=true)
-    func = get_optim_target(gpgpvec, noise=noise, mean=mean, kern=kern)
-    init = get_params(gpgpvec;  noise=noise, mean=mean, kern=kern)  # Initial hyperparameter values
+function optimize!(gpreals::GPRealisations;
+                   noise::Bool=true, domean::Bool=true, kern::Bool=true)
+    func = get_optim_target(gpreals, noise=noise, domean=domean, kern=kern)
+    init = get_params(gpreals;  noise=noise, domean=domean, kern=kern)  # Initial hyperparameter values
     nparams = length(init)
     lower = -Inf*ones(nparams)
     upper = Inf*ones(nparams)
@@ -169,7 +198,7 @@ function optimize!(gpgpvec::GPRealisations;
         ikernstart+=1
         lower[1]=-10.0
     end
-    upper[ikernstart:ikernstart+num_params(gpgpvec.k)-1]=20.0
+    upper[ikernstart:ikernstart+num_params(gpreals.k)-1]=20.0
     best_x = copy(init)
     best_y = Inf
     count = 0

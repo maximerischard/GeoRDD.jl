@@ -17,8 +17,9 @@ function sim_chi_null!(
         gpT::GPE, gpC::GPE, gpNull::GPE, 
         treat::BitVector, Xb::MatF64, 
         Σcliff::PDMat, cK_T::MatF64, cK_C::MatF64; update_mean::Bool=false)
-    n = gpNull.nobsv
-    null = MultivariateNormal(zeros(n), gpNull.cK)
+    # μ = mean(gpNull.m, gpNull.X)
+    μ = zeros(gpNull.nobsv)
+    null = MultivariateNormal(μ, gpNull.cK)
     Ysim = rand(null)
 
     gpT.y = Ysim[treat]
@@ -34,11 +35,9 @@ function sim_chi_null!(
 
     return chistat(gpT, gpC, Xb, Σcliff, cK_T, cK_C)
 end
-function nsim_chi(gpT::GPE, gpC::GPE, Xb::MatF64, nsim::Int; update_mean::Bool=false)
+function nsim_chi(gpT::GPE, gpC::GPE, gpNull::GPE, Xb::MatF64, nsim::Int; update_mean::Bool=false)
     gpT_mod = modifiable(gpT)
     gpC_mod = modifiable(gpC)
-    yNull = [gpT.y; gpC.y]
-    gpNull = GPE([gpT.X gpC.X], yNull, MeanConst(mean(yNull)), gpT.k, gpT.logNoise)
 
     _, Σcliff = cliff_face(gpT, gpC, Xb)
     cK_T = cov(gpT.k, Xb, gpT.X)
@@ -56,8 +55,13 @@ function nsim_chi(gpT::GPE, gpC::GPE, Xb::MatF64, nsim::Int; update_mean::Bool=f
 end
 
 function boot_chi2test(gpT::GPE, gpC::GPE, Xb::MatF64, nsim::Int; update_mean::Bool=false)
+    yNull = [gpT.y; gpC.y]
+    xNull = [gpT.X gpC.X]
+    kNull = gpT.k
+    mNull = MeanConst(mean(yNull))
+    gpNull = GPE(xNull, yNull, mNull, kNull, gpT.logNoise)
     chi_obs = chistat(gpT, gpC, Xb)
-    chi_sims = GeoRDD.nsim_chi(gpT, gpC, Xb, nsim; update_mean=update_mean)
+    chi_sims = GeoRDD.nsim_chi(gpT, gpC, gpNull, Xb, nsim; update_mean=update_mean)
     return mean(chi_sims .> chi_obs)
 end
 
@@ -80,4 +84,7 @@ function placebo_chi(angle::Float64, X::MatF64, Y::Vector,
     Xb = placebo_sentinels(angle, shift, X, 100)
     pval = boot_chi2test(gp_left, gp_right, Xb, nsim; update_mean=update_mean)
     return pval
+end
+function placebo_chi(angle::Float64, gp::GPE, nsim::Int; kwargs...)
+    return placebo_chi(angle, gp.X, gp.y, gp.k, gp.logNoise, nsim; kwargs...)
 end

@@ -77,6 +77,10 @@ function infinite_proj_sentinels(gpT::GPE, gpC::GPE, border::B,
         elseif LibGEOS.distance(p, border) > maxdist
             continue
         elseif !LibGEOS.within(p, region)
+            # Note: the `LibGEOS.jl` point-in-polygon implementation is
+            # stupidly slow. The `ClimateTools.jl` package provides a simple
+            # `inpoly(point, polygon)` function that could be adapted and
+            # is about 10 times faster that `LibGEOS.within`
             continue
         end
         # compute the population density at this location

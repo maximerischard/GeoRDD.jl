@@ -27,3 +27,40 @@ function modifiable(gp::GPE)
         gp.mll, gp.mll, Float64[], Float64[])
     return gp_copy
 end
+function update_alpha!(gp::GPE)
+    m = mean(gp.m,gp.X)
+    gp.alpha = gp.cK \ (gp.y - m)
+end
+function mll(gp::GPE)
+    μ = mean(gp.m,gp.X)
+    return -dot((gp.y - μ),gp.alpha)/2.0 - logdet(gp.cK)/2.0 - gp.nobsv*log(2π)/2.0 # Marginal log-likelihood
+end
+
+function addcov!(cK::AbstractMatrix{Float64}, k::Kernel, X::AbstractMatrix{Float64}, data::KernelData)
+    dim, nobsv = size(X)
+    @assert size(cK, 1) == nobsv
+    @assert size(cK, 2) == nobsv
+    @inbounds for j in 1:nobsv
+        for i in 1:j
+            cK[i,j] += cov_ij(k, X, data, i, j, dim)
+            cK[j,i] = cK[i,j]
+        end
+    end
+end
+function add_diag!(mat::AbstractMatrix, d::Real)
+    n = size(mat, 1)
+    if n!=size(mat, 2)
+        throw("Matrix is not square")
+    end
+    @inbounds for i in 1:n
+        mat[i,i] += d
+    end
+    return mat
+end
+function update_chol!(pd::PDMats.PDMat)
+    mat = pd.mat
+    chol_buffer = pd.chol.factors
+    copy!(chol_buffer, mat)
+    chol = cholfact!(Symmetric(chol_buffer))
+    return PDMats.PDMat(mat, chol)
+end

@@ -85,11 +85,11 @@ end
     ANALYTIC INSTEAD OF BOOTSTRAP CALIBRATION
 =============================================#
 function pval_invvar_calib(gpT::GPE, gpC::GPE, Xb::Matrix)
-    extrap◫_T = GaussianProcesses.predict_f(gpT, Xb; full_cov=true)
-    extrap◫_C = GaussianProcesses.predict_f(gpC, Xb; full_cov=true)
-    μb = extrap◫_T[1].-extrap◫_C[1]
+    predT_b = GaussianProcesses.predict_f(gpT, Xb; full_cov=true)
+    predC_b = GaussianProcesses.predict_f(gpC, Xb; full_cov=true)
+    μb = predT_b[1].-predC_b[1]
     n = size(μb)
-    Σb = extrap◫_T[2]+extrap◫_C[2]
+    Σb = predT_b[2]+predC_b[2]
     
     KbC = cov(gpC.k, Xb, gpC.X)
     KCb = KbC'
@@ -104,9 +104,12 @@ function pval_invvar_calib(gpT::GPE, gpC::GPE, Xb::Matrix)
     AC_c = KCC \ KCb
     AT = AT_c'
     AC = AC_c'
-    cov_μδ = AT*full(KTT)*AT_c + AC*full(KCC)*AC_c - AC*full(KCT)*AT_c - AT*full(KCT)'*AC_c
+    cov_μδ = AT*full(KTT)*AT_c + 
+             AC*full(KCC)*AC_c - 
+             AC*full(KCT)*AT_c - 
+             AT*full(KCT)'*AC_c
     
-    cov_μτ= sum((Σb \ cov_μδ) * (Σb \ ones(n)))
+    cov_μτ = sum((Σb \ cov_μδ) * (Σb \ ones(n)))
     null = Normal(0.0, √cov_μτ)
     
     μτ_numer = sum(Σb \ μb) # numerator only
@@ -133,9 +136,12 @@ function pval_invvar_calib(gpT::GPE, gpC::GPE, Xb::Matrix, Σcliff::PDMat, cK_T:
     AC_c = KCC \ KCb
     AT = AT_c'
     AC = AC_c'
-    cov_μδ = AT*full(KTT)*AT_c + AC*full(KCC)*AC_c - AC*full(KCT)*AT_c - AT*full(KCT)'*AC_c
+    cov_μδ = AT*full(KTT)*AT_c +
+             AC*full(KCC)*AC_c -
+             AC*full(KCT)*AT_c -
+             AT*full(KCT)'*AC_c
     
-    cov_μτ= sum((Σb \ cov_μδ) * (Σb \ ones(n)))
+    cov_μτ = sum((Σb \ cov_μδ) * (Σb \ ones(n)))
     null = Normal(0.0, √cov_μτ)
     
     μτ_numer = sum(Σb \ μb) # numerator only
@@ -166,7 +172,12 @@ function nsim_invvar_calib(gpT::GPE, gpC::GPE, Xb::MatF64, nsim::Int; update_mea
     gpT_mod = GeoRDD.modifiable(gpT)
     gpC_mod = GeoRDD.modifiable(gpC)
     yNull = [gpT.y; gpC.y]
-    gpNull = GPE([gpT.X gpC.X], yNull, MeanConst(mean(yNull)), gpT.k, gpT.logNoise)
+    if update_mean
+        mf_null = MeanConst(mean(yNull))
+    else
+        mf_null = MeanZero()
+    end
+    gpNull = GPE([gpT.X gpC.X], yNull, mf_null, gpT.k, gpT.logNoise)
     treat = BitVector(gpNull.nobsv)
     treat[:] = false
     treat[1:gpT.nobsv] = true
@@ -177,12 +188,21 @@ function nsim_invvar_calib(gpT::GPE, gpC::GPE, Xb::MatF64, nsim::Int; update_mea
 end
 
 function placebo_invvar(angle::Float64, X::MatF64, Y::Vector,
-                 kern::Kernel, logNoise::Float64)
+                        kern::Kernel, logNoise::Float64; update_mean::Bool=false)
     shift = shift_for_even_split(angle, X)
     left = left_points(angle, shift, X)
-    gp_left  = GPE(X[:,left],  Y[left],  MeanConst(mean(Y[left])),  kern, logNoise)
-    gp_right = GPE(X[:,.!left], Y[.!left], MeanConst(mean(Y[.!left])), kern, logNoise)
+    if update_mean
+        mf_left = MeanConst(mean(Y[left]))
+        mf_right = MeanConst(mean(Y[.!left]))
+    else
+        mf_left = mf_right = MeanZero()
+    end
+    gp_left  = GPE(X[:,left],  Y[left],  mf_left,  kern, logNoise)
+    gp_right = GPE(X[:,.!left], Y[.!left], mf_right, kern, logNoise)
     Xb = placebo_sentinels(angle, shift, X, 100)
     pval = pval_invvar_calib(gp_left, gp_right, Xb)
     return pval
+end
+function placebo_invvar(angle::Float64, gp::GPE; kwargs...)
+    return placebo_invvar(angle, gp.X, gp.y, gp.k, gp.logNoise; kwargs...)
 end
