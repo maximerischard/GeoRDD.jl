@@ -37,8 +37,10 @@ module GeoRDD
     include("average_treatment_effect.jl")
     include("weight_at_units.jl")
     # Hypothesis testing
+    include("hypotest.jl")
     include("hypotest_chi2.jl")
     include("hypotest_invvar.jl")
     include("hypotest_mll.jl")
     include("placebo_geometry.jl")
+    include("power.jl")
 end

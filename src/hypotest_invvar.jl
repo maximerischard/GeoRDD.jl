@@ -18,18 +18,11 @@ function pval_invvar(gpT::GPE, gpC::GPE, Xb::MatF64, Σcliff::PDMat, cK_T::MatF6
 end
 
 function sim_invvar!(gpT::GPE, gpC::GPE, gpNull::GPE, 
-            treat::BitVector, Xb::MatF64; update_mean::Bool=false)
-    n = gpNull.nobsv
-    null = MultivariateNormal(zeros(n), gpNull.cK)
-    Ysim = rand(null)
+            treat::BitVector, Xb::MatF64)
+    Ysim = prior_rand(gpNull)
 
     gpT.y[:] = Ysim[treat]
     gpC.y[:] = Ysim[.!treat]
-
-    if update_mean
-        gpT.m = mT = MeanConst(mean(gpT.y))
-        gpC.m = mC = MeanConst(mean(gpC.y))
-    end
 
     update_alpha!(gpT)
     update_alpha!(gpC)
@@ -39,18 +32,11 @@ end
 
 function sim_invvar!(gpT::GPE, gpC::GPE, gpNull::GPE, 
             treat::BitVector, Xb::MatF64, 
-            Σcliff::PDMat, cK_T::MatF64, cK_C::MatF64; update_mean::Bool=false)
-    n = gpNull.nobsv
-    null = MultivariateNormal(zeros(n), gpNull.cK)
-    Ysim = rand(null)
+            Σcliff::PDMat, cK_T::MatF64, cK_C::MatF64)
+    Ysim = prior_rand(gpNull)
 
     gpT.y[:] = Ysim[treat]
     gpC.y[:] = Ysim[.!treat]
-
-    if update_mean
-        gpT.m = mT = MeanConst(mean(gpT.y))
-        gpC.m = mC = MeanConst(mean(gpC.y))
-    end
 
     update_alpha!(gpT)
     update_alpha!(gpC)
@@ -58,26 +44,24 @@ function sim_invvar!(gpT::GPE, gpC::GPE, gpNull::GPE,
     return pval_invvar(gpT, gpC, Xb, Σcliff, cK_T, cK_C)
 end
 
-function nsim_invvar_pval(gpT::GPE, gpC::GPE, Xb::MatF64, nsim::Int; update_mean::Bool=false)
+function nsim_invvar_pval(gpT::GPE, gpC::GPE, Xb::MatF64, nsim::Int)
     gpT_mod = modifiable(gpT)
     gpC_mod = modifiable(gpC)
     _, Σcliff = cliff_face(gpT, gpC, Xb)
     cK_T = cov(gpT.k, Xb, gpT.X)
     cK_C = cov(gpC.k, Xb, gpC.X)
-    yNull = [gpT.y; gpC.y]
-    gpNull = GPE([gpT.X gpC.X], yNull, MeanConst(mean(yNull)), gpT.k, gpT.logNoise)
+    gpNull = make_null(gpT, gpC)
     treat = BitVector(gpNull.nobsv)
     treat[:] = false
     treat[1:gpT.nobsv] = true
-    pval_sims = Float64[sim_invvar!(gpT_mod, gpC_mod, gpNull, treat, Xb, Σcliff, cK_T, cK_C;
-        update_mean=update_mean) 
+    pval_sims = Float64[sim_invvar!(gpT_mod, gpC_mod, gpNull, treat, Xb, Σcliff, cK_T, cK_C) 
         for _ in 1:nsim];
     return pval_sims
 end
 
-function boot_invvar(gpT::GPE, gpC::GPE, Xb::MatF64, nsim::Int; update_mean::Bool=false)
+function boot_invvar(gpT::GPE, gpC::GPE, Xb::MatF64, nsim::Int)
     pval_obs = pval_invvar(gpT, gpC, Xb)
-    pval_sims = nsim_invvar_pval(gpT, gpC, Xb, nsim; update_mean=update_mean)
+    pval_sims = nsim_invvar_pval(gpT, gpC, Xb, nsim)
     return mean(pval_obs .< pval_sims)
 end
 
@@ -150,59 +134,39 @@ function pval_invvar_calib(gpT::GPE, gpC::GPE, Xb::Matrix, Σcliff::PDMat, cK_T:
     return pval
 end
 function sim_invvar_calib!(gpT::GPE, gpC::GPE, gpNull::GPE, 
-            treat::BitVector, Xb::MatF64; update_mean::Bool=false)
-    n = gpNull.nobsv
-    null = MultivariateNormal(zeros(n), gpNull.cK)
-    Ysim = rand(null)
+            treat::BitVector, Xb::MatF64)
+    Ysim = prior_rand(gpNull)
 
     gpT.y[:] = Ysim[treat]
     gpC.y[:] = Ysim[.!treat]
-
-    if update_mean
-        gpT.m = mT = MeanConst(mean(gpT.y))
-        gpC.m = mC = MeanConst(mean(gpC.y))
-    end
 
     GeoRDD.update_alpha!(gpT)
     GeoRDD.update_alpha!(gpC)
 
     return pval_invvar_calib(gpT, gpC, Xb)
 end
-function nsim_invvar_calib(gpT::GPE, gpC::GPE, Xb::MatF64, nsim::Int; update_mean::Bool=false)
+function nsim_invvar_calib(gpT::GPE, gpC::GPE, Xb::MatF64, nsim::Int)
     gpT_mod = GeoRDD.modifiable(gpT)
     gpC_mod = GeoRDD.modifiable(gpC)
-    yNull = [gpT.y; gpC.y]
-    if update_mean
-        mf_null = MeanConst(mean(yNull))
-    else
-        mf_null = MeanZero()
-    end
-    gpNull = GPE([gpT.X gpC.X], yNull, mf_null, gpT.k, gpT.logNoise)
+    gpNull = make_null(gpT_mod, gpC_mod)
     treat = BitVector(gpNull.nobsv)
     treat[:] = false
     treat[1:gpT.nobsv] = true
-    pval_sims = Float64[sim_invvar_calib!(gpT_mod, gpC_mod, gpNull, treat, Xb;
-        update_mean=update_mean) 
+    pval_sims = Float64[sim_invvar_calib!(gpT_mod, gpC_mod, gpNull, treat, Xb) 
         for _ in 1:nsim];
     return pval_sims
 end
 
 function placebo_invvar(angle::Float64, X::MatF64, Y::Vector,
-                        kern::Kernel, logNoise::Float64; update_mean::Bool=false)
+                        kern::Kernel, m::Mean, logNoise::Float64)
     shift = shift_for_even_split(angle, X)
     left = left_points(angle, shift, X)
-    if update_mean
-        mf_left = MeanConst(mean(Y[left]))
-        mf_right = MeanConst(mean(Y[.!left]))
-    else
-        mf_left = mf_right = MeanZero()
-    end
-    gp_left  = GPE(X[:,left],  Y[left],  mf_left,  kern, logNoise)
-    gp_right = GPE(X[:,.!left], Y[.!left], mf_right, kern, logNoise)
+    gp_left  = GPE(X[:,left],   Y[left],   m, kern, logNoise)
+    gp_right = GPE(X[:,.!left], Y[.!left], m, kern, logNoise)
     Xb = placebo_sentinels(angle, shift, X, 100)
     pval = pval_invvar_calib(gp_left, gp_right, Xb)
     return pval
 end
 function placebo_invvar(angle::Float64, gp::GPE; kwargs...)
-    return placebo_invvar(angle, gp.X, gp.y, gp.k, gp.logNoise; kwargs...)
+    return placebo_invvar(angle, gp.X, gp.y, gp.k, gp.m, gp.logNoise; kwargs...)
 end
