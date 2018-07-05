@@ -168,7 +168,7 @@ function regions_from_dataframe(df::AbstractDataFrame, outcome::Symbol, groupind
     return regionDict
 end
 
-function regions_from_dataframe(df::AbstractDataFrame, fmla::Formula)
+function regions_from_dataframe(fmla::Formula, df::AbstractDataFrame)
     parsed = parse_geordd_formula(fmla)
     regions_from_dataframe(df, parsed.outcome, parsed.groupindic, 
                           parsed.spatial_covariates, parsed.lmformula)
