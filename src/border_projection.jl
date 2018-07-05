@@ -6,7 +6,7 @@ using LibGEOS: nearestPoints, interpolate, distance
 using LibGEOS: MultiPolygon, envelope
 import GaussianProcesses: GPE
 
-function projection_points(gp::GPE, border::B; maxdist::Float64=Inf) where {B<:BorderType}
+function projection_points(gp::GPE, border::B, maxdist::Float64) where {B<:BorderType}
     X∂ = Array{Float64}(2, gp.nobsv)
     distances = Vector{Float64}(gp.nobsv)
     for i in 1:gp.nobsv
@@ -26,9 +26,9 @@ function projection_points(gp::GPE, border::B; maxdist::Float64=Inf) where {B<:B
     return X∂[:, distances .<= maxdist]
 end
 
-function proj_estimator(gpT::GPE, gpC::GPE, border::B; maxdist::Float64=Inf) where {B<:BorderType}
-    X∂_treat = projection_points(gpT, border; maxdist=maxdist)
-    X∂_ctrol = projection_points(gpC, border; maxdist=maxdist)
+function proj_estimator(gpT::GPE, gpC::GPE, border::B, maxdist::Float64) where {B<:BorderType}
+    X∂_treat = projection_points(gpT, border, maxdist)
+    X∂_ctrol = projection_points(gpC, border, maxdist)
     X∂ = [X∂_treat X∂_ctrol]
     
     μpost, Σpost = cliff_face(gpT, gpC, X∂)

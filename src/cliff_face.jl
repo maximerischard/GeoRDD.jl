@@ -8,36 +8,32 @@ function cliff_face(gpT::GPE, gpC::GPE, sentinels::MatF64)
     return μposterior, Σposterior
 end
 
-function sim_cliff(gpT::GPE, gpC::GPE, gpNull::GPE, treat::BitVector, X∂::MatF64; update_mean::Bool=false)
-    n = gpNull.nobsv
-    null = MultivariateNormal(zeros(n), gpNull.cK)
+function sim_cliff(gpT::GPE, gpC::GPE, gpNull::GPE, treat::BitVector, X∂::MatF64)
+    μ = mean(gpNull.m, gpNull.X)
+    null = MultivariateNormal(μ, gpNull.cK)
     Ysim = rand(null)
 
     gpT.y = Ysim[treat]
     gpC.y = Ysim[.!treat]
-
-    if update_mean
-        gpT.m = mT = MeanConst(mean(gpT.y))
-        gpC.m = mC = MeanConst(mean(gpC.y))
-    end
 
     update_alpha!(gpT)
     update_alpha!(gpC)
 
     return cliff_face(gpT, gpC, X∂)
 end
-function nsim_cliff(gpT::GPE, gpC::GPE, X∂::MatF64, nsim::Int; update_mean::Bool=false)
+function nsim_cliff(gpT::GPE, gpC::GPE, X∂::MatF64, nsim::Int)
     gpT_mod = modifiable(gpT)
     gpC_mod = modifiable(gpC)
     yNull = [gpT.y; gpC.y]
-    gpNull = GPE([gpT.X gpC.X], yNull, MeanConst(mean(yNull)), gpT.k, gpT.logNoise)
+    mNull = gpT.m
+    gpNull = GPE([gpT.X gpC.X], yNull, mNull, gpT.k, gpT.logNoise)
     treat = BitVector(gpNull.nobsv)
     treat[:] = false
     treat[1:gpT.nobsv] = true
     k = gpT_mod.k
     mT = gpT_mod.m
     mC = gpC_mod.m
-    cliff_sims = [sim_cliff(gpT_mod, gpC_mod, gpNull, treat, X∂; update_mean=update_mean) 
-        for _ in 1:nsim];
+    cliff_sims = [sim_cliff(gpT_mod, gpC_mod, gpNull, treat, X∂) 
+                  for _ in 1:nsim];
     return cliff_sims
 end

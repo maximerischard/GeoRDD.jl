@@ -41,9 +41,9 @@ end
 """
     Compute unit weights for the projected finite-population LATE estimator.
 """
-function weights_proj(gpT::GPE, gpC::GPE, border)
-    Xb_treat = projection_points(gpT, border)
-    Xb_ctrol = projection_points(gpC, border)
+function weights_proj(gpT::GPE, gpC::GPE, border, maxdist::Float64)
+    Xb_treat = projection_points(gpT, border, maxdist)
+    Xb_ctrol = projection_points(gpC, border, maxdist)
     Xb_projected = [Xb_treat Xb_ctrol]
     Xb = Xb_projected
     nb = size(Xb, 2)
@@ -55,10 +55,9 @@ end
 """
     Compute unit weights for the projected land LATE estimator.
 """
-function weights_geo(gpT::GPE, gpC::GPE, nb::Int, border, region)
-    nb = 100
+function weights_geo(gpT::GPE, gpC::GPE, border, region, maxdist::Float64, gridspace::Float64)
     Xb_projected, w_border = infinite_proj_sentinels(
-            gpT, gpC, border, region, 0.2, 2.0/nb)
+            gpT, gpC, border, region, maxdist, gridspace)
     Xb = Xb_projected
     w_units = [weight_at_units(gpT, Xb, w_border); -weight_at_units(gpC, Xb, w_border)]
     return Xb, w_border, w_units
@@ -67,10 +66,9 @@ end
 """
     Compute unit weights for the projected superpopulation LATE estimator.
 """
-function weights_pop(gpT::GPE, gpC::GPE, density::Function, nb::Int, border, region)
-    nb = 100
+function weights_pop(gpT::GPE, gpC::GPE, density::Function, border, region, maxdist::Float64, gridspace::Float64)
     Xb_projected, w_border = infinite_proj_sentinels(
-            gpT, gpC, border, region, 0.2, 2.0/nb; density=density)
+            gpT, gpC, border, region, maxdist, gridspace; density=density)
     Xb = Xb_projected
     w_units = [weight_at_units(gpT, Xb, w_border); -weight_at_units(gpC, Xb, w_border)]
     return Xb, w_border, w_units
