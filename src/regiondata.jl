@@ -1,18 +1,18 @@
-type RegionData
-    X::Matrix{Float64} # dim×n spatial covariates
+mutable struct RegionData
+    x::Matrix{Float64} # dim×n spatial covariates
     y::Vector{Float64} # outcomes
     D::Matrix{Float64} # p×n non-spatial covariates
-    shape::Nullable{RegionType}
+    shape::Union{RegionType,Nothing}
 end
-function RegionData(X::MatF64, y::VecF64, D::MatF64)
-    RegionData(X, y, D, Nullable{RegionType}())
+function RegionData(x::AbstractMatrix, y::AbstractVector, D::AbstractMatrix)
+    RegionData(x, y, D, nothing)
 end
 
-residuals(rd::RegionData, β::VecF64) = rd.y - rd.D'β
-residuals_data(rd::RegionData, β::VecF64) = RegionData(
-        rd.X, 
+residuals(rd::RegionData, β::AbstractVector) = rd.y - rd.D'β
+residuals_data(rd::RegionData, β::AbstractVector) = RegionData(
+        rd.x, 
         residuals(rd, β),
-        Matrix{Float64}(0, length(rd.y)), # empty covariates
+        Matrix{Float64}(undef, 0, length(rd.y)), # empty covariates
         rd.shape
        )
 
@@ -21,53 +21,45 @@ residuals_data(rd::RegionData, β::VecF64) = RegionData(
 ################
 
 function get_border(rdA::RegionData, rdB::RegionData, args...)
-    !isnull(rdA.shape) || throw("first region has no shape")
-    !isnull(rdB.shape) || throw("second region has no shape")
-    return get_border(get(rdA.shape), get(rdB.shape), args...)
+    rdA.shape != nothing || throw("first region has no shape")
+    rdB.shape != nothing || throw("second region has no shape")
+    return get_border(rdA.shape, rdB.shape, args...)
 end
 
 #####################################
 ### Iterate over adjacent regions ###
 #####################################
 
-type AdjacentIterator{KEY}
+mutable struct AdjacentIterator{KEY}
     allpairs::Combinatorics.Combinations{Array{KEY,1}}
     rddict::Dict{KEY, RegionData}
     buffer::Float64
 end
 
-function start(adj::AdjacentIterator)
+function next_combi_state(adj, combi_state)
     itr = adj.allpairs
-    combi = start(itr)
-    while !done(itr, combi)
-        pair, combi = next(itr, combi)
+    while combi_state !== nothing
+        (pair, state) = combi_state
         di = adj.rddict[pair[1]]
         dj = adj.rddict[pair[2]]
         border = get_border(di, dj, adj.buffer)
         if border isa BorderType
-            return (false, (pair, border), combi)
+            return ((pair, border), state)
         end
+        combi_state = iterate(itr, state)
     end
-    return (true, )
+    return nothing
 end
-function done(adj::AdjacentIterator, state)
-    return state[1]
-end
-function next(adj::AdjacentIterator, state)
+function iterate(adj::AdjacentIterator)
     itr = adj.allpairs
-    _, prevpair, combi = state
-    while !done(itr, combi)
-        pair, combi = next(itr, combi)
-        di = adj.rddict[pair[1]]
-        dj = adj.rddict[pair[2]]
-        border = get_border(di, dj, adj.buffer)
-        if border isa BorderType
-            return prevpair, (false, (pair, border), combi)
-        end
-    end
-    return prevpair, (true, prevpair, combi)
+    combi_state = iterate(itr)
+    return next_combi_state(adj, combi_state)
 end
-iteratorsize(::AdjacentIterator) = Base.SizeUnknown()
+function iterate(adj::AdjacentIterator, state)
+    itr = adj.allpairs
+    combi_state = iterate(itr, state)
+    return next_combi_state(adj, combi_state)
+end
 
 function adjacent_pairs(rd_dict::Dict{KEY, RegionData}, buffer::Float64) where {KEY}
     allpairs = Combinatorics.Combinations(collect(keys(rd_dict)), 2)
@@ -150,12 +142,12 @@ function regions_from_dataframe(df::AbstractDataFrame, outcome::Symbol, groupind
     KEY = eltype(groupKeys)
     regionDict = Dict{KEY, RegionData}()
     for key in groupKeys
-        irows = find(group_col .== key)
-        nobsv = length(irows)
-        if nobsv == 0
+        irows = findall(group_col .== key)
+        nobs = length(irows)
+        if nobs == 0
             continue
         end
-        X_key = Matrix{Float64}(spatialdim, nobsv)
+        X_key = Matrix{Float64}(undef, spatialdim, nobs)
         for p in 1:spatialdim
             X_key[p, :] = df[irows, spatial_covariates[p]]
         end

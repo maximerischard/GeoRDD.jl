@@ -1,6 +1,4 @@
-import Base: mean
-
-type MultiGPCovars{KEY}
+mutable struct MultiGPCovars{KEY}
     D::Array{Float64,2}
     y::Vector{Float64}
     groupKeys::Vector{KEY}
@@ -8,10 +6,10 @@ type MultiGPCovars{KEY}
     groupIndices::Dict{KEY,UnitRange{Int64}}
     p::Int
     dim::Int
-    nobsv::Int
+    nobs::Int
     logNoise::Float64
-    m::Mean
-    k::Kernel
+    mean::Mean
+    kernel::Kernel
     βkern::Kernel
     βdata::KernelData
     # Auxiliary data
@@ -27,35 +25,35 @@ type MultiGPCovars{KEY}
             groupIndices::Dict{KEY,UnitRange{Int64}},
             p::Int,
             dim::Int,
-            nobsv::Int,
+            nobs::Int,
             logNoise::Float64,
-            m::Mean,
-            k::Kernel,
+            mean::Mean,
+            kernel::Kernel,
             βkern::Kernel
             ) where {KEY}
-        size(D, 2) == nobsv || throw("incompatible dimensions of covariates matrix and gaussian processes")
+        size(D, 2) == nobs || throw("incompatible dimensions of covariates matrix and gaussian processes")
         size(D, 1) == p || throw("first dimension of D is not p")
         length(groupKeys) == length(groupIndices) || throw("groupKeys and groupIndices should have same length")
         length(groupKeys) == length(mgp) || throw("groupKeys and mgp should have same length")
-        βdata=KernelData(βkern, D)
-        mgpcv = new(D, y, groupKeys, mgp, groupIndices, p, dim, nobsv, logNoise, m, k, βkern, βdata)
+        βdata=KernelData(βkern, D, D)
+        mgpcv = new(D, y, groupKeys, mgp, groupIndices, p, dim, nobs, logNoise, mean, kernel, βkern, βdata)
         propagate_params!(mgpcv)
         initialise_mll!(mgpcv)
         return mgpcv
     end
 end
 function MultiGPCovars(Dlist::Vector{M}, gpList::Vector{GPE}, groupKeys::Vector{KEY}, βkern::Kernel) where {M<:AbstractMatrix{Float64}, KEY}
-    total_nobsv = sum([gp.nobsv for gp in gpList])
+    total_nobs = sum([gp.nobs for gp in gpList])
     D = hcat(Dlist...)
-    size(D, 2) == total_nobsv || throw(ArgumentError("incompatible dimensions of covariates matrix and gaussian processes"))
+    size(D, 2) == total_nobs || throw(ArgumentError("incompatible dimensions of covariates matrix and gaussian processes"))
     p = size(D,1)
 
     # get kernel and parameters from first GP in list
     first_gp = gpList[1]
     dim = first_gp.dim
     logNoise = first_gp.logNoise
-    kern = first_gp.k
-    m = first_gp.m
+    kern = first_gp.kernel
+    mean = first_gp.mean
     ngroups = length(groupKeys)
     @assert ngroups == length(gpList)
     gpDict = Dict{KEY, GPE}()
@@ -64,23 +62,23 @@ function MultiGPCovars(Dlist::Vector{M}, gpList::Vector{GPE}, groupKeys::Vector{
     for j in 1:ngroups
         gp = gpList[j]
         key = groupKeys[j]
-        nobsv = gp.nobsv
-        gp.nobsv > 0 || throw("empty group")
-        groupIndices[key] = istart:istart+nobsv-1
+        nobs = gp.nobs
+        gp.nobs > 0 || throw("empty group")
+        groupIndices[key] = istart:istart+nobs-1
         gpDict[key] = gp
-        istart += nobsv
+        istart += nobs
     end
     y = vcat([gp.y for gp in gpList]...)
     mgpcv = MultiGPCovars{KEY}(
                 D, y, groupKeys, gpDict, groupIndices, 
-                p, dim, total_nobsv, logNoise, m, kern, βkern)
+                p, dim, total_nobs, logNoise, mean, kern, βkern)
     return mgpcv
 end
 function propagate_params!(mgpcv::MultiGPCovars)
     for gp in values(mgpcv.mgp)
         # harmonize parameters
-        gp.k = mgpcv.k
-        gp.m = mgpcv.m
+        gp.kernel = mgpcv.kernel
+        gp.mean = mgpcv.mean
         gp.logNoise = mgpcv.logNoise
     end
 end
@@ -89,39 +87,39 @@ function update_mll!(mgpcv::MultiGPCovars)
     propagate_params!(mgpcv)
     cK = mgpcv.cK.mat
     cov!(cK, mgpcv.βkern, mgpcv.D, mgpcv.βdata)
-    μ = Array{Float64}(mgpcv.nobsv)
+    μ = Array{Float64}(undef, mgpcv.nobs)
     for key in mgpcv.groupKeys
         gp = mgpcv.mgp[key]
         slice = mgpcv.groupIndices[key]
-        μ[slice] = mean(mgpcv.m,gp.X)
-        addcov!(view(cK, slice, slice), mgpcv.k, gp.X, gp.data)
+        μ[slice] = mean(mgpcv.mean,gp.x)
+        addcov!(view(cK, slice, slice), mgpcv.kernel, gp.x, gp.data)
     end
     add_diag!(cK, max(exp(2*mgpcv.logNoise),1e-8))
     mgpcv.cK = update_chol!(mgpcv.cK)
     mgpcv.alpha = mgpcv.cK \ (mgpcv.y - μ)
-    mgpcv.mll = -dot((mgpcv.y - μ),mgpcv.alpha)/2.0 - logdet(mgpcv.cK)/2.0 - mgpcv.nobsv*log(2π)/2.0 # Marginal log-likelihood
+    mgpcv.mll = -dot((mgpcv.y - μ),mgpcv.alpha)/2.0 - logdet(mgpcv.cK)/2.0 - mgpcv.nobs*log(2π)/2.0 # Marginal log-likelihood
 end
 
 function initialise_mll!(mgpcv::MultiGPCovars)
-    cK = Array{Float64}(mgpcv.nobsv, mgpcv.nobsv)
+    cK = Array{Float64}(undef, mgpcv.nobs, mgpcv.nobs)
     propagate_params!(mgpcv)
     cov!(cK, mgpcv.βkern, mgpcv.D, mgpcv.βdata)
-    μ = Array{Float64}(mgpcv.nobsv)
+    μ = Array{Float64}(undef, mgpcv.nobs)
     for key in mgpcv.groupKeys
         gp = mgpcv.mgp[key]
         slice = mgpcv.groupIndices[key]
-        μ[slice] = mean(mgpcv.m,gp.X)
-        addcov!(view(cK, slice, slice), mgpcv.k, gp.X, gp.data)
+        μ[slice] = mean(mgpcv.mean, gp.x)
+        addcov!(view(cK, slice, slice), mgpcv.kernel, gp.x, gp.data)
     end
     add_diag!(cK, max(exp(2*mgpcv.logNoise),1e-8))
     mgpcv.cK = PDMats.PDMat(cK)
     mgpcv.alpha = mgpcv.cK \ (mgpcv.y .- μ)
-    mgpcv.mll = -dot((mgpcv.y-μ),mgpcv.alpha)/2.0 - logdet(mgpcv.cK)/2.0 - mgpcv.nobsv*log(2π)/2.0
+    mgpcv.mll = -dot((mgpcv.y-μ),mgpcv.alpha)/2.0 - logdet(mgpcv.cK)/2.0 - mgpcv.nobs*log(2π)/2.0
 end
 
 
 function update_mll_and_dmll!(
-        mgpcv::MultiGPCovars, ααinvcKI::MatF64
+        mgpcv::MultiGPCovars, ααinvcKI::AbstractMatrix
         ; 
         noise::Bool=true,  # include gradient component for the logNoise term
         domean::Bool=true, # include gradient components for the mean parameters
@@ -129,10 +127,10 @@ function update_mll_and_dmll!(
         beta::Bool=true,   # include gradient components for the linear regression prior terms
     )
     update_mll!(mgpcv)
-    n_mean_params = num_params(mgpcv.m)
-    n_kern_params = num_params(mgpcv.k)
+    n_mean_params = num_params(mgpcv.mean)
+    n_kern_params = num_params(mgpcv.kernel)
     n_beta_params = num_params(mgpcv.βkern)
-    dmll = Array{Float64}(noise + domean*n_mean_params + kern*n_kern_params + beta*n_beta_params)
+    dmll = Array{Float64}(undef, noise + domean*n_mean_params + kern*n_kern_params + beta*n_beta_params)
     logNoise = mgpcv.logNoise
     get_ααinvcKI!(ααinvcKI, mgpcv.cK, mgpcv.alpha)
     i=1
@@ -141,7 +139,7 @@ function update_mll_and_dmll!(
         i+=1
     end
     if domean
-        Mgrads = vcat([grad_stack(gp.m, gp.X) for gp in values(mgpcv.mgp)]...)
+        Mgrads = vcat([grad_stack(gp.mean, gp.x) for gp in values(mgpcv.mgp)]...)
         for j in 1:n_mean_params
             dmll[i] = dot(Mgrads[:,j],mgpcv.alpha)
             i+=1
@@ -154,8 +152,8 @@ function update_mll_and_dmll!(
             gp = mgpcv.mgp[key]
             slice = mgpcv.groupIndices[key]
             ααview = view(ααinvcKI, slice, slice)
-            dmll_k_gp = Vector{Float64}(n_kern_params)
-            dmll_kern!(dmll_k_gp, gp.k, gp.X, gp.data, ααview)
+            dmll_k_gp = Vector{Float64}(undef, n_kern_params)
+            dmll_kern!(dmll_k_gp, gp.kernel, gp.x, gp.data, ααview)
             dmll_k .+= dmll_k_gp
         end
         i += n_kern_params
@@ -170,8 +168,8 @@ end
 function get_params(mgpcv::MultiGPCovars; noise::Bool=true, domean::Bool=true, kern::Bool=true, beta::Bool=true)
     params = Float64[]
     if noise; push!(params, mgpcv.logNoise); end
-    if domean;  append!(params, get_params(mgpcv.m)); end
-    if kern; append!(params,  get_params(mgpcv.k)); end
+    if domean;  append!(params, get_params(mgpcv.mean)); end
+    if kern; append!(params,  get_params(mgpcv.kernel)); end
     if beta; append!(params,  get_params(mgpcv.βkern)); end
     return params
 end
@@ -183,12 +181,12 @@ function set_params!(mgpcv::MultiGPCovars, hyp::Vector{Float64};
         i+=1
     end
     if domean
-        set_params!(mgpcv.m, hyp[i:i+num_params(mgpcv.m)-1])
-        i+=num_params(mgpcv.m)
+        set_params!(mgpcv.mean, hyp[i:i+num_params(mgpcv.mean)-1])
+        i+=num_params(mgpcv.mean)
     end
     if kern
-        set_params!(mgpcv.k, hyp[i:i+num_params(mgpcv.k)-1])
-        i+=num_params(mgpcv.k)
+        set_params!(mgpcv.kernel, hyp[i:i+num_params(mgpcv.kernel)-1])
+        i+=num_params(mgpcv.kernel)
     end
     if beta
         set_params!(mgpcv.βkern, hyp[i:i+num_params(mgpcv.βkern)-1])
@@ -199,7 +197,7 @@ end
 
 function optimize!(mgpcv::MultiGPCovars; noise::Bool=true, domean::Bool=true, kern::Bool=true, beta::Bool=true, 
                     method=ConjugateGradient(), options=Optim.Options())
-    cK_buffer = Array{Float64}(mgpcv.nobsv, mgpcv.nobsv)
+    cK_buffer = Array{Float64}(undef, mgpcv.nobs, mgpcv.nobs)
     function mll(hyp::Vector{Float64})
         try
             set_params!(mgpcv, hyp; noise=noise, domean=domean, kern=kern, beta=beta)
@@ -212,7 +210,7 @@ function optimize!(mgpcv::MultiGPCovars; noise::Bool=true, domean::Bool=true, ke
             elseif isa(err, ArgumentError)
                 println(err)
                 return Inf
-            elseif isa(err, Base.LinAlg.PosDefException)
+            elseif isa(err, LinearAlgebra.PosDefException)
                 println(err)
                 return Inf
             else
@@ -234,7 +232,7 @@ function optimize!(mgpcv::MultiGPCovars; noise::Bool=true, domean::Bool=true, ke
             elseif isa(err, ArgumentError)
                 println(err)
                 return Inf
-            elseif isa(err, Base.LinAlg.PosDefException)
+            elseif isa(err, LinearAlgebra.PosDefException)
                 println(err)
                 return Inf
             else
@@ -258,11 +256,11 @@ end
     Obtain the full (block diagonal) spatial covariance matrix
 """
 function spatial_cov(mgpcv::MultiGPCovars)
-    cK = zeros(mgpcv.nobsv, mgpcv.nobsv)
+    cK = zeros(mgpcv.nobs, mgpcv.nobs)
     for key in mgpcv.groupKeys
         gp = mgpcv.mgp[key]
         slice = mgpcv.groupIndices[key]
-        addcov!(view(cK, slice, slice), mgpcv.k, gp.X, gp.data)
+        addcov!(view(cK, slice, slice), mgpcv.kernel, gp.x, gp.data)
     end
     return cK
 end
@@ -274,7 +272,7 @@ end
 """
 function get_ΣYβ(mgpcv::MultiGPCovars)
     cK = spatial_cov(mgpcv)
-    for i in 1:mgpcv.nobsv
+    for i in 1:mgpcv.nobs
         cK[i,i] += max(exp(2*mgpcv.logNoise),1e-8)
     end
     return PDMats.PDMat(cK)
@@ -284,11 +282,11 @@ end
     Evaluate the mean function.
 """
 function mean(mgpcv::MultiGPCovars)
-    μ = Array{Float64}(mgpcv.nobsv)
+    μ = Array{Float64}(undef, mgpcv.nobs)
     for key in mgpcv.groupKeys
         gp = mgpcv.mgp[key]
         slice = mgpcv.groupIndices[key]
-        μ[slice] = mean(mgpcv.m,gp.X)
+        μ[slice] = mean(mgpcv.mean,gp.x)
     end
     return μ
 end    

@@ -1,12 +1,12 @@
 function sim_power!(gpT::GPE, gpC::GPE, gpNull::GPE, τ::Float64, 
-            treat::BitVector, Xb::MatF64,
+            treat::BitVector, Xb::AbstractMatrix,
                 chi_null::Vector{Float64}, 
                 mll_null::Vector{Float64}, 
                 pval_invvar_null::Vector{Float64},
                 Σcliff::PDMat,
-                cK_T::MatF64,
-                cK_C::MatF64,
-                KCT::MatF64
+                cK_T::AbstractMatrix,
+                cK_C::AbstractMatrix,
+                KCT::AbstractMatrix
                )
     # simulate data
     Ysim = prior_rand(gpNull)
@@ -44,7 +44,7 @@ function sim_power!(gpT::GPE, gpC::GPE, gpNull::GPE, τ::Float64,
 end
 
 function nsim_power(gpT::GPE, gpC::GPE, τ::Float64, 
-                Xb::MatF64,
+                Xb::AbstractMatrix,
                 chi_null::Vector{Float64}, 
                 mll_null::Vector{Float64}, 
                 pval_invvar_null::Vector{Float64},
@@ -55,13 +55,13 @@ function nsim_power(gpT::GPE, gpC::GPE, τ::Float64,
     gpNull = make_null(gpT_mod, gpC_mod)
 
     _, Σcliff = cliff_face(gpT, gpC, Xb)
-    cK_T = cov(gpT.k, Xb, gpT.X)
-    cK_C = cov(gpC.k, Xb, gpC.X)
-    KCT = cov(gpC.k, gpC.X, gpT.X)
+    cK_T = cov(gpT.kernel, Xb, gpT.x)
+    cK_C = cov(gpC.kernel, Xb, gpC.x)
+    KCT = cov(gpC.kernel, gpC.x, gpT.x)
 
-    treat = BitVector(gpNull.nobsv)
+    treat = BitVector(gpNull.nobs)
     treat[:] = false
-    treat[1:gpT.nobsv] = true
+    treat[1:gpT.nobs] = true
     power_sims = [sim_power!(gpT_mod, gpC_mod, gpNull, τ, treat, Xb, 
                             chi_null, mll_null, pval_invvar_null,
                             Σcliff, cK_T, cK_C, KCT

@@ -1,19 +1,19 @@
-import GaussianProcesses: MatF64, VecF64, Mean, Kernel
-import Base: copy
-
-
-function predict_mu(gp::GPE, X::MatF64, cK::MatF64)
+function predict_mu(gp::GPE, X::AbstractMatrix, cK::AbstractMatrix)
     n = size(X, 2)
-    mu = mean(gp.m, X) + cK*gp.alpha        # Predictive mean
+    mu = mean(gp.mean, X) + cK*gp.alpha        # Predictive mean
     return mu
 end
 
-function _predict_raw{M<:MatF64}(gp::GPE, X::M)
-    n = size(X, 2)
-    cK = cov(gp.k, X, gp.X)
-    Lck = PDMats.whiten(gp.cK, cK')
-    mu = predict_mu(gp, X, cK)             # Predictive mean
-    Sigma_raw = cov(gp.k, X) - Lck'Lck     # Predictive covariance
+function _predict_raw(gp::GPE, X::AbstractMatrix)
+    crossdata = KernelData(gp.kernel, gp.x, X)
+    priordata = KernelData(gp.kernel, X, X)
+    cK = cov(gp.kernel, gp.x, X, crossdata)
+    mu = mean(gp.mean, X) + cK'*gp.alpha        # Predictive mean
+    Lck = whiten!(gp.cK, cK)
+    Sigma_raw = cov(gp.kernel, X, X, priordata)
+    # Sigma_raw = Sigma_raw - Lck'Lck
+    LinearAlgebra.BLAS.syrk!('U', 'T', -1.0, Lck, 1.0, Sigma_raw)
+    LinearAlgebra.copytri!(Sigma_raw, 'U')
     return mu, Sigma_raw
 end
 
@@ -21,28 +21,28 @@ end
     modification of the outcomes Y. This is useful for bootstrapping.
 """
 function modifiable(gp::GPE)
-    gp_copy = GPE(gp.m, gp.k, gp.logNoise, gp.nobsv,
-        gp.X, copy(gp.y), gp.data,
+    gp_copy = GPE(gp.mean, gp.kernel, gp.logNoise, gp.nobs,
+        gp.x, copy(gp.y), gp.data,
         gp.dim, gp.cK, copy(gp.alpha),
         gp.mll, gp.mll, Float64[], Float64[])
     return gp_copy
 end
 function update_alpha!(gp::GPE)
-    m = mean(gp.m,gp.X)
+    m = mean(gp.mean,gp.x)
     gp.alpha = gp.cK \ (gp.y - m)
 end
 function mll(gp::GPE)
-    μ = mean(gp.m,gp.X)
-    return -dot((gp.y - μ),gp.alpha)/2.0 - logdet(gp.cK)/2.0 - gp.nobsv*log(2π)/2.0 # Marginal log-likelihood
+    μ = mean(gp.mean,gp.x)
+    return -dot((gp.y - μ),gp.alpha)/2.0 - logdet(gp.cK)/2.0 - gp.nobs*log(2π)/2.0 # Marginal log-likelihood
 end
 
-function addcov!(cK::AbstractMatrix{Float64}, k::Kernel, X::AbstractMatrix{Float64}, data::KernelData)
-    dim, nobsv = size(X)
-    @assert size(cK, 1) == nobsv
-    @assert size(cK, 2) == nobsv
-    @inbounds for j in 1:nobsv
+function addcov!(cK::AbstractMatrix{Float64}, kernel::Kernel, X::AbstractMatrix{Float64}, data::KernelData)
+    dim, nobs = size(X)
+    @assert size(cK, 1) == nobs
+    @assert size(cK, 2) == nobs
+    @inbounds for j in 1:nobs
         for i in 1:j
-            cK[i,j] += cov_ij(k, X, data, i, j, dim)
+            cK[i,j] += cov_ij(kernel, X, X, data, i, j, dim)
             cK[j,i] = cK[i,j]
         end
     end
@@ -58,9 +58,9 @@ function add_diag!(mat::AbstractMatrix, d::Real)
     return mat
 end
 function update_chol!(pd::PDMats.PDMat)
-    mat = pd.mat
-    chol_buffer = pd.chol.factors
-    copy!(chol_buffer, mat)
-    chol = cholfact!(Symmetric(chol_buffer))
-    return PDMats.PDMat(mat, chol)
+    Σbuffer = mat(pd)
+    Σbuffer, chol = make_posdef!(Σbuffer, cholfactors(pd))
+    new_pd = wrap_cK(pd, Σbuffer, chol)
+    return new_pd
 end
+

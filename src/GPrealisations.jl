@@ -1,35 +1,35 @@
-type GPRealisations{KEY}
+mutable struct GPRealisations{KEY}
     groupKeys::Vector{KEY}
     mgp::Dict{KEY,GPE}
-    nobsv::Int
+    nobs::Int
     logNoise::Float64
-    m::Mean
-    k::Kernel
+    mean::Mean
+    kernel::Kernel
     mll::Float64            # Marginal log-likelihood
     dmll::Vector{Float64}   # Gradient marginal log-likelihood
     function GPRealisations{KEY}(
             groupKeys::Vector{KEY},
             mgp::Dict{KEY,GPE}, 
-            nobsv::Int,
+            nobs::Int,
             logNoise::Float64,
-            m::Mean,
-            k::Kernel,
+            mean::Mean,
+            kernel::Kernel,
             ) where {KEY}
         length(groupKeys) == length(mgp) || throw("groupKeys and mgp should have same length")
-        gpreals = new(groupKeys, mgp, nobsv, logNoise, m, k)
+        gpreals = new(groupKeys, mgp, nobs, logNoise, mean, kernel)
         propagate_params!(gpreals)
         update_mll!(gpreals)
         return gpreals
     end
 end
 function GPRealisations(gpList::Vector{GPE}, groupKeys::Vector{KEY}) where {KEY}
-    total_nobsv = sum([gp.nobsv for gp in gpList])
+    total_nobs = sum([gp.nobs for gp in gpList])
     # get kernel and parameters from first GP in list
     first_gp = gpList[1]
     dim = first_gp.dim
     logNoise = first_gp.logNoise
-    kern = first_gp.k
-    m = first_gp.m
+    kern = first_gp.kernel
+    mean = first_gp.mean
     ngroups = length(groupKeys)
     @assert ngroups == length(gpList)
     gpDict = Dict{KEY, GPE}()
@@ -37,14 +37,14 @@ function GPRealisations(gpList::Vector{GPE}, groupKeys::Vector{KEY}) where {KEY}
     for j in 1:ngroups
         gp = gpList[j]
         key = groupKeys[j]
-        nobsv = gp.nobsv
-        gp.nobsv > 0 || throw("empty group")
+        nobs = gp.nobs
+        gp.nobs > 0 || throw("empty group")
         gpDict[key] = gp
-        istart += nobsv
+        istart += nobs
     end
     gpreals = GPRealisations{KEY}(
                 groupKeys, gpDict, 
-                total_nobsv, logNoise, m, kern)
+                total_nobs, logNoise, mean, kern)
     return gpreals
 end
 
@@ -58,17 +58,17 @@ function get_params(gpreals::GPRealisations;
     if noise; push!(params, gpreals.logNoise); end
     if domean
         for gp in values(gpreals.mgp)
-            append!(params, get_params(gp.m))
+            append!(params, get_params(gp.mean))
         end
     end
-    if kern; append!(params, get_params(gpreals.k)); end
+    if kern; append!(params, get_params(gpreals.kernel)); end
     return params
 end
 function propagate_params!(gpreals::GPRealisations; noise::Bool=true, kern::Bool=true)
     for gp in values(gpreals.mgp)
         # harmonize parameters
         if kern
-            gp.k = gpreals.k
+            gp.kernel = gpreals.kernel
         end
         if noise
             gp.logNoise = gpreals.logNoise
@@ -86,12 +86,12 @@ function set_params!(gpreals::GPRealisations, hyp::Vector{Float64};
     if domean
         for key in gpreals.groupKeys
             gp = gpreals.mgp[key]
-            set_params!(gp.m, hyp[istart:istart+num_params(gp.m)-1])
-            istart += num_params(gp.m)
+            set_params!(gp.mean, hyp[istart:istart+num_params(gp.mean)-1])
+            istart += num_params(gp.mean)
         end
     end
     if kern
-        set_params!(gpreals.k, hyp[istart:end])
+        set_params!(gpreals.kernel, hyp[istart:end])
     end
     propagate_params!(gpreals, noise=noise, kern=kern)
 end
@@ -111,9 +111,9 @@ function update_mll_and_dmll!(gpreals::GPRealisations,
     gpreals.mll = 0.0
     gpreals.dmll = zeros(get_params(gpreals; noise=noise, domean=domean, kern=kern))
     imean=2
-    ikern=collect((length(gpreals.dmll)-num_params(gpreals.k)+1):length(gpreals.dmll))
+    ikern=collect((length(gpreals.dmll)-num_params(gpreals.kernel)+1):length(gpreals.dmll))
     for gp in values(gpreals.mgp)
-        update_mll_and_dmll!(gp, ααinvcKIs[gp.nobsv]; 
+        update_mll_and_dmll!(gp, ααinvcKIs[gp.nobs]; 
             noise=noise,  domean=domean, kern=kern)
         gpreals.mll += gp.mll
         dmll_indices=Int[]
@@ -121,8 +121,8 @@ function update_mll_and_dmll!(gpreals::GPRealisations,
             push!(dmll_indices, 1)
         end
         if domean
-            append!(dmll_indices, imean:imean+num_params(gp.m)-1)
-            imean+=num_params(gp.m)
+            append!(dmll_indices, imean:imean+num_params(gp.mean)-1)
+            imean+=num_params(gp.mean)
         end
         if kern
             append!(dmll_indices, ikern)
@@ -134,10 +134,10 @@ end
 function update_mll_and_dmll!(gpreals::GPRealisations; kwargs...)
     ααinvcKIs = Dict{Int,Matrix}()
     for gp in values(gpreals.mgp)
-        if haskey(ααinvcKIs, gp.nobsv)
+        if haskey(ααinvcKIs, gp.nobs)
             continue
         end
-        ααinvcKIs[gp.nobsv] = Array{Float64}(gp.nobsv, gp.nobsv)
+        ααinvcKIs[gp.nobs] = Array{Float64}(gp.nobs, gp.nobs)
     end
     return update_mll_and_dmll!(gpreals, ααinvcKIs)
 end
@@ -146,10 +146,10 @@ function get_optim_target(gpreals::GPRealisations;
                           noise::Bool=true, domean::Bool=true, kern::Bool=true)
     ααinvcKIs = Dict{Int,Matrix}()
     for gp in values(gpreals.mgp)
-        if haskey(ααinvcKIs, gp.nobsv)
+        if haskey(ααinvcKIs, gp.nobs)
             continue
         end
-        ααinvcKIs[gp.nobsv] = Array{Float64}(gp.nobsv, gp.nobsv)
+        ααinvcKIs[gp.nobs] = Array{Float64}(gp.nobs, gp.nobs)
     end
     function mll(hyp::Vector{Float64})
         try
@@ -198,7 +198,7 @@ function optimize!(gpreals::GPRealisations;
         ikernstart+=1
         lower[1]=-10.0
     end
-    upper[ikernstart:ikernstart+num_params(gpreals.k)-1]=20.0
+    upper[ikernstart:ikernstart+num_params(gpreals.kernel)-1]=20.0
     best_x = copy(init)
     best_y = Inf
     count = 0

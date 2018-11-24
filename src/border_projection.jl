@@ -1,17 +1,10 @@
-import GeoInterface: coordinates, xcoord, ycoord
-import LibGEOS
-import IterTools
-import DataStructures
-using LibGEOS: nearestPoints, interpolate, distance
-using LibGEOS: MultiPolygon, envelope
-import GaussianProcesses: GPE
 
 function projection_points(gp::GPE, border::B, maxdist::Float64) where {B<:BorderType}
-    X∂ = Array{Float64}(2, gp.nobsv)
-    distances = Vector{Float64}(gp.nobsv)
-    for i in 1:gp.nobsv
+    X∂ = Array{Float64}(undef, 2, gp.nobs)
+    distances = Vector{Float64}(undef, gp.nobs)
+    for i in 1:gp.nobs
         # obtain coordinates for treatment point
-        x,y = gp.X[:,i]
+        x,y = gp.x[:,i]
         point = LibGEOS.Point(x,y)
         # projection onto border (as distance along border)
         distances[i] = LibGEOS.distance(border, point)
@@ -37,8 +30,8 @@ end
 
 function data_hull(gpT::GPE, gpC::GPE)
     # Obtain a convex hull containing all the data.
-    X_multi_treat = LibGEOS.MultiPoint([gpT.X[:, i] for i in 1:gpT.nobsv])
-    X_multi_ctrol = LibGEOS.MultiPoint([gpC.X[:, i] for i in 1:gpC.nobsv])
+    X_multi_treat = LibGEOS.MultiPoint([gpT.x[:, i] for i in 1:gpT.nobs])
+    X_multi_ctrol = LibGEOS.MultiPoint([gpC.x[:, i] for i in 1:gpC.nobs])
     convexhull_treat = LibGEOS.convexhull(X_multi_treat)
     convexhull_ctrol = LibGEOS.convexhull(X_multi_ctrol)
     hull = LibGEOS.union(convexhull_treat, convexhull_ctrol)
@@ -67,7 +60,7 @@ function infinite_proj_sentinels(gpT::GPE, gpC::GPE, border::B,
     border_envelope = envelope(border)
 
     projected_weights = Dict{Vector{Float64}, Float64}()
-    for (s1,s2) in IterTools.product(X1_grid, X2_grid)
+    for (s1,s2) in Iterators.product(X1_grid, X2_grid)
         # convert to a point obejct
         p = LibGEOS.Point(s1,s2)
         # Only keep points that are both within `maxdist` of

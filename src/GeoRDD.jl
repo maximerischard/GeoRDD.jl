@@ -1,21 +1,27 @@
 module GeoRDD
+    using Statistics
+    import Statistics: mean
     using GaussianProcesses
     using PDMats
     using Optim
     import GeoInterface
+    using GeoInterface: coordinates, xcoord, ycoord
+    using LibGEOS: nearestPoints, interpolate, distance
+    using LibGEOS: MultiPolygon, envelope
     import LibGEOS
     import LibGEOS: interpolate
     import Combinatorics
-    import Base: mean, getindex, keys, values, start, done, next, iteratorsize, iteratoreltype, eltype, length, size, convert
+    using LinearAlgebra
+    import Base: getindex, keys, values, start, done, next, iterate, eltype, length, size, convert
     using Distributions: Normal, MultivariateNormal, ccdf, cdf
     using PDMats: AbstractPDMat
     import GaussianProcesses: update_mll!, update_mll_and_dmll!, 
                               get_params, set_params!, num_params,
                               optimize!, GPE
-    using GaussianProcesses: MatF64, VecF64,
-                             grad_stack, grad_stack!, grad_slice!, get_ααinvcKI!,
-                             Mean, Kernel, KernelData, LinIso,
-                             cov!, cov, cov_ij, dmll_kern!
+    using GaussianProcesses: grad_stack, grad_stack!, grad_slice!, get_ααinvcKI!,
+                             Mean, Kernel, KernelData, LinIso, MeanZero,
+                             cov!, cov, cov_ij, dmll_kern!,
+                             mat, cholfactors, wrap_cK, make_posdef!
     import StatsModels
     using StatsModels: Formula
     import DataFrames

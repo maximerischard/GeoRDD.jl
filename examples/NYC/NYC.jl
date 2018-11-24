@@ -2,6 +2,7 @@ import LibGEOS
 import GeoJSON
 import Base.convert
 using DataFrames
+using Distributions
 import CSV
 import JSON
 
@@ -238,3 +239,33 @@ end
             # :Y_dict => Y_dict
             # )
 # end
+
+function table_τpair(τpost_pairs::Dict{Tuple{NYC.SchDistr,NYC.SchDistr},Normal}, include_distr::Vector{Int})
+    τ_pair_nested = Dict{NYC.SchDistr, Dict{NYC.SchDistr, Normal}}()
+    for (distrA, distrB) in keys(τpost_pairs)
+        τpost = τpost_pairs[distrA, distrB]
+        if distrA ∉ include_distr
+            continue
+        end
+        if distrB ∉ include_distr
+            continue
+        end
+        if distrA ∉ keys(τ_pair_nested)
+            τ_pair_nested[distrA] = Dict{NYC.SchDistr, Normal}()
+        end
+        τ_pair_nested[distrA][distrB] = τpost
+    end
+    ;
+
+    for distrA in sort(collect(keys(τ_pair_nested)))
+        if isempty(τ_pair_nested[distrA])
+            continue
+        end
+        @printf("\\( \\mathbf{%2d} \\)", distrA)
+        for distrB in sort(collect(keys(τ_pair_nested[distrA])))
+            τ = τ_pair_nested[distrA][distrB]
+            @printf("& \\( \\mathbf{%2d:}~%+.2f \\pm %.2f \\)", distrB, -mean(τ), std(τ))
+        end
+        print("\\\\ \n")
+    end
+end

@@ -14,7 +14,7 @@ function interpolate(border::LibGEOS.MultiLineString, dist::Real)
     return interp
 end
 function sentinels(border::BorderType, nsent::Int)
-    sentinel_distances = linspace(0, LibGEOS.geomLength(border), nsent)
+    sentinel_distances = range(0, stop=LibGEOS.geomLength(border), length=nsent)
     sentinel_points = [interpolate(border,q) for q in sentinel_distances]
     sentinel_coords = [GeoInterface.coordinates(p) for p in sentinel_points]
     sentinels_x = [p[1] for p in sentinel_coords]
@@ -42,14 +42,14 @@ function raw_border(A_T::RegionType, A_C::RegionType, buffer::Float64)
 end
 function get_border(A_T::RegionType, A_C::RegionType, buffer::Float64)
     if LibGEOS.distance(LibGEOS.envelope(A_T), LibGEOS.envelope(A_C)) > buffer
-        return Void
+        return nothing
     end
     if LibGEOS.distance(A_T, A_C) > buffer
-        return Void
+        return nothing
     end
     border = raw_border(A_T, A_C, buffer)
     if !(typeof(border) <: BorderType)
-        return Void
+        return nothing
     end
     border = GeoRDD.rearrange_lines(border)
     return border
@@ -124,7 +124,7 @@ end
 """
 function prep_distances(segments)
     nseg = length(segments)
-    distances = Array{Float64}(nseg, nseg)
+    distances = Array{Float64}(undef, nseg, nseg)
     for j in 1:length(segments)
         for i in 1:length(segments)
             iseg = segments[i]

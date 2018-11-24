@@ -1,6 +1,7 @@
 using GeoInterface
 using LibGEOS
 
+using LinearAlgebra
 using LaTeXStrings
 using Formatting
 import PyPlot; plt=PyPlot
@@ -17,7 +18,7 @@ using PyCall
 function plot_polygon(poly_coords, facecolor, alpha; 
                       edgecolor="none", linestyle="None", linewidth=0.0, kwargs...)
     ax = plt.gca()
-    poly_array = Array{Float64}(length(poly_coords), 2)
+    poly_array = Array{Float64}(undef, length(poly_coords), 2)
     for i in 1:length(poly_coords)
         poly_array[i, :] = poly_coords[i]
     end
@@ -122,8 +123,8 @@ function plot_all_pairs(τpost_pairs::Dict{Tuple{SchDistr,SchDistr}}, regionData
             continue
         end
 
-        shapeA = get(regionData_dict[distrA].shape)
-        shapeB = get(regionData_dict[distrB].shape)
+        shapeA = regionData_dict[distrA].shape
+        shapeB = regionData_dict[distrB].shape
         border = GeoRDD.get_border(shapeA, shapeB, 10.0)
 
         border_coords = GeoInterface.coordinates(border)
@@ -312,7 +313,7 @@ function plot_sales(filtered, missing_sqft; edgecolor="black", labelsize=12.0, l
     ax[:set_autoscaley_on](false)
     plot_schdistr_labels(fontsize=labelsize, labelcolor=labelcolor)
 end
-function plot_cliffface(μ, Σ, color; label=L"posterior of $\tau(x)$ on residuals")
+function plot_cliffface(μ, Σ, color; ndraws::Int=10, label=L"posterior of $\tau(x)$ on residuals")
     plt.plot(μ, color=color, ".", label=label)
     msize=10
     plt.plot(1,μ[1], color=cbbPalette[5], 
@@ -327,7 +328,7 @@ function plot_cliffface(μ, Σ, color; label=L"posterior of $\tau(x)$ on residua
         zorder=-2,
         )
     posterior_distr = MultivariateNormal(μ, Σ)
-    for _ in 1:10
+    for _ in 1:ndraws
         plt.plot(1:length(μ), rand(posterior_distr), "-", color="white", alpha=0.4, linewidth=1.5, zorder=-1)
     end
     plt.xlim(1,length(μ))
@@ -353,7 +354,7 @@ end
 ####### 3D plot ##########################
 ##########################################
 
-immutable IndexablePoint <: AbstractPoint2D
+struct IndexablePoint <: AbstractPoint2D
     _x::Float64
     _y::Float64
     index::Int64
@@ -536,7 +537,7 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
     ax[:set_xticklabels]([])
     ax[:set_yticklabels]([])
     _zlim = plt.zlim()
-    plt.zticks(ceil(_zlim[1], 1):0.2:floor(_zlim[2], 1))
+    plt.zticks(ceil(_zlim[1], 1):0.2:floor(_zlim[2]; digits=1))
 #     plt.xlim(xlim)
 #     plt.ylim(ylim)
     

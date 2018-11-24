@@ -1,4 +1,4 @@
-immutable Point
+struct Point
     x::Float64
     y::Float64
 end
@@ -57,7 +57,7 @@ function plot_line(angle::Float64, shift::Float64, X::Matrix; kwargs...)
     plt.ylim(ylim)
 end
 
-function placebo_sentinels(angle::Float64, shift::Float64, X::MatF64, npoints::Int)
+function placebo_sentinels(angle::Float64, shift::Float64, X::AbstractMatrix, npoints::Int)
     meanx=mean(X[1,:])
     meany=mean(X[2,:])
     minx,maxx = extrema(X[1,:])
@@ -93,8 +93,8 @@ function placebo_sentinels(angle::Float64, shift::Float64, X::MatF64, npoints::I
         push!(extremes, (x_from_maxy, maxy))
     end
     @assert length(extremes)==2
-    x∂ = linspace(extremes[1][1], extremes[2][1], npoints)
-    y∂ = linspace(extremes[1][2], extremes[2][2], npoints)
+    x∂ = range(extremes[1][1], stop=extremes[2][1], length=npoints)
+    y∂ = range(extremes[1][2], stop=extremes[2][2], length=npoints)
     X∂ = Float64[x∂'; y∂']
     return X∂
 end

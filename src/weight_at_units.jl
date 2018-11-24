@@ -11,7 +11,7 @@
 """
 function weight_at_units(gp::GPE, sentinels::Matrix, weights::Vector)
     @assert size(sentinels, 2) == length(weights)
-    K_Xb = cov(gp.k, gp.X, sentinels)
+    K_Xb = cov(gp.kernel, gp.x, sentinels)
     K_XX = gp.cK
     w_unit = (K_XX \ K_Xb) * weights ./ sum(weights)
     return w_unit

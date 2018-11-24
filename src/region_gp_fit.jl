@@ -1,17 +1,13 @@
-"""
-    Fit regional data using Gaussian processes.
-"""
+GPE(rd::RegionData, args...) = GPE(rd.x, rd.y, args...)
 
-GPE(rd::RegionData, args...) = GPE(rd.X, rd.y, args...)
-
-function MultiGPCovars(rdict::Dict{KEY,RegionData}, groupKeys::AbstractVector{KEY}, spkern::Kernel, βkern::Kernel, σ::Float64, m::Mean=MeanZero()) where {KEY}
+function MultiGPCovars(rdict::Dict{KEY,RegionData}, groupKeys::AbstractVector{KEY}, spkern::Kernel, βkern::Kernel, σ::Float64, mean::Mean=MeanZero()) where {KEY}
     Dlist = Matrix{Float64}[]
     gpList = GPE[]
     for key in groupKeys
         rd = rdict[key]
         D = rd.D
         y = rd.y
-        gp = GPE(rd.X, rd.y, m, spkern, log(σ))
+        gp = GPE(rd.x, rd.y, mean, spkern, log(σ))
         push!(gpList, gp)
         push!(Dlist, D)
     end
@@ -22,12 +18,12 @@ function MultiGPCovars(rdict::Dict{KEY,RegionData}, spkern::Kernel, args...) whe
     return MultiGPCovars(rdict, groupKeys, spkern, args...)
 end
 
-function GPRealisations(rdict::Dict{KEY,RegionData}, groupKeys::AbstractVector{KEY}, spkern::Kernel, σ::Float64, m::Mean=MeanZero()) where {KEY}
+function GPRealisations(rdict::Dict{KEY,RegionData}, groupKeys::AbstractVector{KEY}, spkern::Kernel, σ::Float64, mean::Mean=MeanZero()) where {KEY}
     gpList = GPE[]
     for key in groupKeys
         rd = rdict[key]
         y = rd.y
-        gp = GPE(rd.X, rd.y, m, spkern, log(σ))
+        gp = GPE(rd.x, rd.y, mean, spkern, log(σ))
         push!(gpList, gp)
     end
     return GPRealisations(gpList, groupKeys)

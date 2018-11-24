@@ -15,7 +15,7 @@ function unweighted_mean(μ::AbstractVector, Σ::AbstractMatrix)
     return τpost
 end
 function unweighted_mean(μ::AbstractVector, Σ::AbstractPDMat)
-    return unweighted_mean(μ, full(Σ))
+    return unweighted_mean(μ, Matrix(Σ))
 end
 
 function weighted_mean(μ::AbstractVector, Σ::M, w::AbstractVector) where {M<:Union{AbstractMatrix,AbstractPDMat}}
@@ -25,6 +25,6 @@ function weighted_mean(μ::AbstractVector, Σ::M, w::AbstractVector) where {M<:U
     return τpost
 end
 # function weighted_mean(μ::AbstractVector, Σ::AbstractPDMat, w)
-    # return weighted_mean(μ, full(Σ), w)
+    # return weighted_mean(μ, PDMats.full(Σ), w)
 # end
 
