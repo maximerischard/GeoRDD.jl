@@ -39,7 +39,7 @@ jupyter notebook for a step-by-step example of how to
 perform the GeoRDD analysis.
 If you run into any trouble, please open a GitHub issue.
 
-For a more complete example using real data, see [`notebooks/SimulatedExample.ipynb`](notebooks/SimulatedExample.ipynb), which reproduces the example in the paper of estimating the difference in house prices between school districts in NYC.
+For a more complete example using real data, see [`notebooks/NYC_analysis.ipynb`](notebooks/NYC_analysis.ipynb), which reproduces the example in the paper of estimating the difference in house prices between school districts in NYC.
 
 ## Reproducibility
 
