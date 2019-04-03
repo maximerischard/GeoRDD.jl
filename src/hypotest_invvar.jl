@@ -76,7 +76,7 @@ function pval_invvar_calib(gpT::GPE, gpC::GPE, Xb::Matrix)
     Σb = predT_b[2]+predC_b[2]
     
     KbC = cov(gpC.kernel, Xb, gpC.x)
-    KCb = KbC'
+    KCb = Matrix(KbC')
     KCC = gpC.cK
     
     KCT = cov(gpC.kernel, gpC.x, gpT.x)
@@ -88,10 +88,10 @@ function pval_invvar_calib(gpT::GPE, gpC::GPE, Xb::Matrix)
     AC_c = KCC \ KCb
     AT = AT_c'
     AC = AC_c'
-    cov_μδ = AT*full(KTT)*AT_c + 
-             AC*full(KCC)*AC_c - 
-             AC*full(KCT)*AT_c - 
-             AT*full(KCT)'*AC_c
+    cov_μδ = AT*Matrix(KTT)*AT_c + 
+             AC*Matrix(KCC)*AC_c - 
+             AC*Matrix(KCT)*AT_c - 
+             AT*Matrix(KCT)'*AC_c
     
     cov_μτ = sum((Σb \ cov_μδ) * (Σb \ ones(n)))
     null = Normal(0.0, √cov_μτ)

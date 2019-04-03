@@ -1,3 +1,13 @@
+import GaussianProcesses: update_mll!, update_mll_and_dmll!, 
+                          get_params, set_params!, num_params,
+                          optimize!, GPE
+using GaussianProcesses: grad_stack, grad_stack!, grad_slice!, get_ααinvcKI!,
+                         Mean, Kernel, KernelData, LinIso, MeanZero,
+                         cov!, cov, cov_ij, dmll_kern!,
+                         mat, cholfactors, wrap_cK, make_posdef!
+using PDMats
+using LinearAlgebra
+
 mutable struct GPRealisations{KEY}
     groupKeys::Vector{KEY}
     mgp::Dict{KEY,GPE}

@@ -1,3 +1,5 @@
+using GaussianProcesses: Mean, Kernel, GPE
+
 GPE(rd::RegionData, args...) = GPE(rd.x, rd.y, args...)
 
 function MultiGPCovars(rdict::Dict{KEY,RegionData}, groupKeys::AbstractVector{KEY}, spkern::Kernel, βkern::Kernel, σ::Float64, mean::Mean=MeanZero()) where {KEY}

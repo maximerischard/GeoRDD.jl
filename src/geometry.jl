@@ -1,3 +1,8 @@
+using LibGEOS: distance, envelope
+import LibGEOS: interpolate
+using Combinatorics: permutations, combinations
+using GeoInterface: coordinates, xcoord, ycoord
+
 # type conversion
 const BorderType = Union{LibGEOS.MultiLineString, LibGEOS.LineString}
 BorderType(ls::GeoInterface.LineString) = LibGEOS.LineString(ls)
@@ -16,7 +21,7 @@ end
 function sentinels(border::BorderType, nsent::Int)
     sentinel_distances = range(0, stop=LibGEOS.geomLength(border), length=nsent)
     sentinel_points = [interpolate(border,q) for q in sentinel_distances]
-    sentinel_coords = [GeoInterface.coordinates(p) for p in sentinel_points]
+    sentinel_coords = [coordinates(p) for p in sentinel_points]
     sentinels_x = [p[1] for p in sentinel_coords]
     sentinels_y = [p[2] for p in sentinel_coords]
     Xb = [sentinels_x' ; sentinels_y']
@@ -24,8 +29,8 @@ function sentinels(border::BorderType, nsent::Int)
 end
 
 function inregion(point::GeoInterface.Point, region::GeoInterface.MultiPolygon)
-    xy = GeoInterface.coordinates(point)
-    poly_coords = GeoInterface.coordinates(region)
+    xy = coordinates(point)
+    poly_coords = coordinates(region)
     isin = false
     for poly in poly_coords
         if inpoly(xy, hcat(poly_coords)...)
@@ -41,10 +46,10 @@ function raw_border(A_T::RegionType, A_C::RegionType, buffer::Float64)
     return border
 end
 function get_border(A_T::RegionType, A_C::RegionType, buffer::Float64)
-    if LibGEOS.distance(LibGEOS.envelope(A_T), LibGEOS.envelope(A_C)) > buffer
+    if distance(envelope(A_T), envelope(A_C)) > buffer
         return nothing
     end
-    if LibGEOS.distance(A_T, A_C) > buffer
+    if distance(A_T, A_C) > buffer
         return nothing
     end
     border = raw_border(A_T, A_C, buffer)
@@ -79,7 +84,7 @@ function region_grid(region::RegionType, gridspace::Float64)
         for y in X2_grid
        ])
     inregion_gridpoints = LibGEOS.intersection(region, gridpoints)
-    grid_coords = GeoInterface.coordinates(inregion_gridpoints)
+    grid_coords = coordinates(inregion_gridpoints)
     grid_mat = hcat(grid_coords...)
     return grid_mat
 end
@@ -149,7 +154,7 @@ function _shortest_path_brute(distmat::Matrix{Float64})
     nseg = size(distmat, 1)
     mind = Inf
     shortest = collect(1:nseg)
-    for order in Combinatorics.permutations(1:nseg)
+    for order in permutations(1:nseg)
         d = travel_distance(distmat, order)
         if d < mind
             shortest = order
@@ -165,7 +170,7 @@ function _shortest_path_greedy(distmat::Matrix{Float64})
     converged = false
     while !converged
         converged = true
-        for swap_pair in Combinatorics.combinations(1:nseg, 2)
+        for swap_pair in combinations(1:nseg, 2)
             i, j = swap_pair
             order[i], order[j] = order[j], order[i]
             d = travel_distance(distmat, order)
@@ -212,7 +217,7 @@ function best_orientation(segments)
     nseg = length(segments)
     shortest_updown = zeros(Bool, nseg)
     mindo = dist_orientation(segments, shortest_updown)
-    for up in Combinatorics.combinations(1:nseg)
+    for up in combinations(1:nseg)
         updown = zeros(Bool, nseg)
         updown[up] = true
         d = dist_orientation(segments, updown)
@@ -245,7 +250,7 @@ function rearrange_lines(lines::T) where T <: GeoInterface.AbstractLineString
     return lines
 end
 function rearrange_lines(lines::T) where T <: GeoInterface.AbstractMultiLineString
-    segments = GeoInterface.coordinates(lines)
+    segments = coordinates(lines)
     ordered = rearrange_lines(segments)
     return T(ordered)
 end

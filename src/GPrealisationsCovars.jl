@@ -135,7 +135,7 @@ function update_mll_and_dmll!(
     get_ααinvcKI!(ααinvcKI, mgpcv.cK, mgpcv.alpha)
     i=1
     if noise
-        dmll[i] = exp(2*logNoise)*trace(ααinvcKI)
+        dmll[i] = exp(2*logNoise)*tr(ααinvcKI)
         i+=1
     end
     if domean

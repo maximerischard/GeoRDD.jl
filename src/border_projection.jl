@@ -1,3 +1,5 @@
+using LibGEOS: nearestPoints, distance, MultiPolygon, envelope
+using GeoInterface: coordinates, xcoord, ycoord
 
 function projection_points(gp::GPE, border::B, maxdist::Float64) where {B<:BorderType}
     X∂ = Array{Float64}(undef, 2, gp.nobs)
@@ -7,7 +9,7 @@ function projection_points(gp::GPE, border::B, maxdist::Float64) where {B<:Borde
         x,y = gp.x[:,i]
         point = LibGEOS.Point(x,y)
         # projection onto border (as distance along border)
-        distances[i] = LibGEOS.distance(border, point)
+        distances[i] = distance(border, point)
         proj_point = nearestPoints(border, point)[1]
         # get border point from distance
         # proj_point = interpolate(border, proj_dist)
@@ -65,9 +67,9 @@ function infinite_proj_sentinels(gpT::GPE, gpC::GPE, border::B,
         p = LibGEOS.Point(s1,s2)
         # Only keep points that are both within `maxdist` of
         # the border, and are in the convex hull of the data.
-        if LibGEOS.distance(p, border_envelope) > maxdist
+        if distance(p, border_envelope) > maxdist
             continue
-        elseif LibGEOS.distance(p, border) > maxdist
+        elseif distance(p, border) > maxdist
             continue
         elseif !LibGEOS.within(p, region)
             # Note: the `LibGEOS.jl` point-in-polygon implementation is

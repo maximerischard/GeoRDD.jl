@@ -1,3 +1,5 @@
+using PDMats: PDMat
+
 function chistat(gpT::GPE, gpC::GPE, Xb::AbstractMatrix)
     pred_T = _predict_raw(gpT, Xb)
     pred_C = _predict_raw(gpC, Xb)
