@@ -528,7 +528,7 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
     centreT = mean(gridT[:,T_inside], 2)
     plt.text3D(centreC[1], centreC[2], predC_b[50], labelC, horizontalalignment="left")
     plt.text3D(centreT[1], centreT[2], predT_b[50], labelT, 
-        color="white", fontweight=200, horizontalalignment="right")
+        color="black", fontweight=200, horizontalalignment="right")
     ax=plt.gca()
     plt.xlabel("Eastings")
     plt.ylabel("Northings")
