@@ -7,7 +7,7 @@ mutable struct MultiGPCovars{KEY}
     p::Int
     dim::Int
     nobs::Int
-    logNoise::Float64
+    logNoise::Real
     mean::Mean
     kernel::Kernel
     βkern::Kernel
@@ -26,7 +26,7 @@ mutable struct MultiGPCovars{KEY}
             p::Int,
             dim::Int,
             nobs::Int,
-            logNoise::Float64,
+            logNoise::Real,
             mean::Mean,
             kernel::Kernel,
             βkern::Kernel
@@ -74,6 +74,11 @@ function MultiGPCovars(Dlist::Vector{M}, gpList::Vector{GPE}, groupKeys::Vector{
                 p, dim, total_nobs, logNoise, mean, kern, βkern)
     return mgpcv
 end
+
+Base.getindex(mgpcv::MultiGPCovars{KEY}, key::KEY) where {KEY} = mgpcv.mgp[key]
+Base.keys(mgpcv::MultiGPCovars) = mgpcv.groupKeys
+Base.values(mgpcv::MultiGPCovars) = values(mgpcv.mgp)
+
 function propagate_params!(mgpcv::MultiGPCovars)
     for gp in values(mgpcv.mgp)
         # harmonize parameters
@@ -196,7 +201,7 @@ function set_params!(mgpcv::MultiGPCovars, hyp::Vector{Float64};
 end
 
 function optimize!(mgpcv::MultiGPCovars; noise::Bool=true, domean::Bool=true, kern::Bool=true, beta::Bool=true, 
-                    method=ConjugateGradient(), options=Optim.Options())
+                    method=Optim.ConjugateGradient(), options=Optim.Options())
     cK_buffer = Array{Float64}(undef, mgpcv.nobs, mgpcv.nobs)
     function mll(hyp::Vector{Float64})
         try
@@ -281,7 +286,7 @@ end
 """
     Evaluate the mean function.
 """
-function mean(mgpcv::MultiGPCovars)
+function Statistics.mean(mgpcv::MultiGPCovars)
     μ = Array{Float64}(undef, mgpcv.nobs)
     for key in mgpcv.groupKeys
         gp = mgpcv.mgp[key]

@@ -1,3 +1,4 @@
+using Statistics
 import GaussianProcesses: update_mll!, update_mll_and_dmll!, 
                           get_params, set_params!, num_params,
                           optimize!, GPE
@@ -7,6 +8,8 @@ using GaussianProcesses: grad_stack, grad_stack!, grad_slice!, get_ααinvcKI!,
                          mat, cholfactors, wrap_cK, make_posdef!
 using PDMats
 using LinearAlgebra
+using GaussianProcesses
+import Optim
 
 mutable struct GPRealisations{KEY}
     groupKeys::Vector{KEY}
@@ -58,9 +61,9 @@ function GPRealisations(gpList::Vector{GPE}, groupKeys::Vector{KEY}) where {KEY}
     return gpreals
 end
 
-getindex(gpreals::GPRealisations{KEY}, key::KEY) where {KEY} = gpreals.mgp[key]
-keys(gpreals::GPRealisations) = gpreals.groupKeys
-values(gpreals::GPRealisations) = values(gpreals.mgp)
+Base.getindex(gpreals::GPRealisations{KEY}, key::KEY) where {KEY} = gpreals.mgp[key]
+Base.keys(gpreals::GPRealisations) = gpreals.groupKeys
+Base.values(gpreals::GPRealisations) = values(gpreals.mgp)
 
 function get_params(gpreals::GPRealisations; 
                     noise::Bool=true, domean::Bool=true, kern::Bool=true)

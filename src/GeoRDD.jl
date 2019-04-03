@@ -23,7 +23,8 @@ module GeoRDD
         include("GPrealisationsCovars.jl")
         include("gp_utils.jl")
     end
-    using .GPrealisations: GPRealisations, MultiGPCovars
+    import .GPrealisations: GPRealisations, MultiGPCovars
+    using .GPrealisations: postmean_β
 
     include("region_gp_fit.jl")
     # Cliff Face (treatment effect estimation)
