@@ -1,4 +1,4 @@
-mutable struct MultiGPCovars{KEY}
+mutable struct MultiGPCovars{KEY,BETA<:Kernel}
     D::Array{Float64,2}
     y::Vector{Float64}
     groupKeys::Vector{KEY}
@@ -7,30 +7,33 @@ mutable struct MultiGPCovars{KEY}
     p::Int
     dim::Int
     nobs::Int
-    logNoise::Real
+    # logNoise::Scalar
+    logNoise::Float64
     mean::Mean
     kernel::Kernel
-    βkern::Kernel
+    βkern::BETA
     βdata::KernelData
     # Auxiliary data
     cK::PDMats.PDMat        # (k + obsNoise)
     alpha::Vector{Float64}  # (k + obsNoise)⁻¹y
     mll::Float64            # Marginal log-likelihood
     dmll::Vector{Float64}   # Gradient marginal log-likelihood
-    function MultiGPCovars{KEY}(
-            D::Array{Float64,2}, 
-            y::Vector{Float64},
-            groupKeys::Vector{KEY},
-            mgp::Dict{KEY,GPE}, 
-            groupIndices::Dict{KEY,UnitRange{Int64}},
-            p::Int,
-            dim::Int,
-            nobs::Int,
-            logNoise::Real,
-            mean::Mean,
-            kernel::Kernel,
-            βkern::Kernel
-            ) where {KEY}
+    # function MultiGPCovars{KEY}(
+            # D::Array{Float64,2}, y::Vector{Float64}, groupKeys::Vector{KEY},
+            # mgp::Dict{KEY,GPE}, groupIndices::Dict{KEY,UnitRange{Int64}},
+            # p::Int, dim::Int, nobs::Int, logNoise::Real,
+            # mean::Mean, kernel::Kernel, βkern::Kernel
+            # ) where {KEY}
+        # ln = Scalar(logNoise)
+        # MultiGPCovars{KEY}(D, y, groupKeys, mgp, groupIndices, p, dim, nobs, ln, mean, kernel, βkern)
+    # end
+    function MultiGPCovars{KEY,BETA}(
+            D::Array{Float64,2}, y::Vector{Float64}, groupKeys::Vector{KEY},
+            mgp::Dict{KEY,GPE}, groupIndices::Dict{KEY,UnitRange{Int64}},
+            # p::Int, dim::Int, nobs::Int, logNoise::Scalar,
+            p::Int, dim::Int, nobs::Int, logNoise::Float64,
+            mean::Mean, kernel::Kernel, βkern::BETA
+            ) where {KEY,BETA<:Kernel}
         size(D, 2) == nobs || throw("incompatible dimensions of covariates matrix and gaussian processes")
         size(D, 1) == p || throw("first dimension of D is not p")
         length(groupKeys) == length(groupIndices) || throw("groupKeys and groupIndices should have same length")
@@ -42,6 +45,8 @@ mutable struct MultiGPCovars{KEY}
         return mgpcv
     end
 end
+const MultiGPLinReg = MultiGPCovars{KEY,BETA} where {KEY,BETA<:LinIso}
+
 function MultiGPCovars(Dlist::Vector{M}, gpList::Vector{GPE}, groupKeys::Vector{KEY}, βkern::Kernel) where {M<:AbstractMatrix{Float64}, KEY}
     total_nobs = sum([gp.nobs for gp in gpList])
     D = hcat(Dlist...)
@@ -69,7 +74,7 @@ function MultiGPCovars(Dlist::Vector{M}, gpList::Vector{GPE}, groupKeys::Vector{
         istart += nobs
     end
     y = vcat([gp.y for gp in gpList]...)
-    mgpcv = MultiGPCovars{KEY}(
+    mgpcv = MultiGPCovars{KEY,typeof(βkern)}(
                 D, y, groupKeys, gpDict, groupIndices, 
                 p, dim, total_nobs, logNoise, mean, kern, βkern)
     return mgpcv

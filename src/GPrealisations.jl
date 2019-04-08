@@ -21,19 +21,21 @@ mutable struct GPRealisations{KEY}
     mll::Float64            # Marginal log-likelihood
     dmll::Vector{Float64}   # Gradient marginal log-likelihood
     function GPRealisations{KEY}(
-            groupKeys::Vector{KEY},
-            mgp::Dict{KEY,GPE}, 
-            nobs::Int,
-            logNoise::Float64,
-            mean::Mean,
-            kernel::Kernel,
-            ) where {KEY}
+            groupKeys::Vector{KEY}, mgp::Dict{KEY,GPE}, nobs::Int, logNoise::Float64,
+            # groupKeys::Vector{KEY}, mgp::Dict{KEY,GPE}, nobs::Int, logNoise::Scalar,
+            mean::Mean, kernel::Kernel) where {KEY}
         length(groupKeys) == length(mgp) || throw("groupKeys and mgp should have same length")
         gpreals = new(groupKeys, mgp, nobs, logNoise, mean, kernel)
         propagate_params!(gpreals)
         update_mll!(gpreals)
         return gpreals
     end
+    # function GPRealisations{KEY}(
+            # groupKeys::Vector{KEY}, mgp::Dict{KEY,GPE}, nobs::Int, logNoise::Real,
+            # mean::Mean, kernel::Kernel) where {KEY}
+        # ln = Scalar(logNoise)
+        # GPRealisations{KEY}(groupKeys, mgp, nobs, ln, mean, kernel)
+    # end
 end
 function GPRealisations(gpList::Vector{GPE}, groupKeys::Vector{KEY}) where {KEY}
     total_nobs = sum([gp.nobs for gp in gpList])
