@@ -5,43 +5,13 @@ using GaussianProcesses
 using Distributions
 using Random
 using Optim
-using Printf
 using LinearAlgebra
+
 
 function run_simulation()
     Random.seed!(1) # for replicability
-    n = 300
-    X = rand(2, n)
-    f_X = sin.(X[1,:] * 2.0) .+ 3.0 .* X[2,:].^2.0
-    m = -0.8 # mean offset
     τ = 0.3 # constant treatment effect
-    treatment_radius = 0.8
-    covarA = randn(n)
-    covarB = randn(n)
-    categ = rand(["A", "B", "C"], n) # random cateogry
-    treat = sqrt.(X[1,:].^2 + X[2,:].^2) .< treatment_radius
-
-    # outcome is: smooth surface + noise + treatment effect
-    Y = m .+ # mean offset
-        f_X .+ # smooth surface
-        0.3*randn(n) .+ # noise
-        τ .* treat .+ # treatment effect
-        covarA .* 0.1 .+ # effect of real-valued covariate
-        (categ.=="B") .* 0.2 # raise category B a little bit
-    border_X1 = treatment_radius .* cos.(range(0,stop=π/2,length=1000))
-    border_X2 = treatment_radius .* sin.(range(0,stop=π/2,length=1000))
-    border_geo = LibGEOS.LineString([[border_X1[i], border_X2[i]] for i in 1:n])
-    geordd_df = DataFrame(
-        X1 = X[1, :],
-        X2 = X[2, :],
-        outcome = Y,
-        region = treat, # treatment indicator
-        covarA = covarA,
-        covarB = covarB,
-        categ = categ
-        )
-    categorical!(geordd_df, :categ)
-    categorical!(geordd_df, :region)
+    geordd_df, border_X1, border_X2, border_geo = sim_data(300, τ)
     fmla = @formula(outcome ~ GP(X1, X2) | region + covarA + covarB + categ)
     geordd = GeoRDD.regions_from_dataframe(fmla, geordd_df)
     # choose a Gaussian process kernel from the GaussianProcesses.jl package
@@ -52,7 +22,7 @@ function run_simulation()
     # create the Gaussian process object from the regional data:
     mgpcv = GeoRDD.MultiGPCovars(geordd, k_se+k_m, βkern, logNoise)
     # optimize the hyperparameters
-    @time opt_output=optimize!(
+    opt_output=optimize!(
             mgpcv, 
             noise=true,
             kern=true,
