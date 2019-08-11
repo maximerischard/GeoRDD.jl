@@ -5,7 +5,7 @@ import GaussianProcesses: update_mll!, update_mll_and_dmll!,
 using GaussianProcesses: grad_stack, grad_stack!, grad_slice!, get_ααinvcKI!,
                          Mean, Kernel, KernelData, LinIso, MeanZero,
                          cov!, cov, cov_ij, dmll_kern!,
-                         mat, cholfactors, wrap_cK, make_posdef!
+                         mat, cholfactors, wrap_cK, make_posdef!, Scalar
 using PDMats
 using LinearAlgebra
 using GaussianProcesses

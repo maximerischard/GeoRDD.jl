@@ -6,6 +6,6 @@ NLopt
 LibGEOS
 GeoInterface
 Combinatorics
-DataFrames
-StatsModels 0.2.5
+DataFrames 0.19
+StatsModels 0.6
 Distributions

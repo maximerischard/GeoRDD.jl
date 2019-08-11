@@ -13,7 +13,7 @@ using VoronoiDelaunay
 import VoronoiDelaunay: getx, gety, DelaunayEdge, DelaunayTriangle
 
 using PyCall
-@pyimport mpl_toolkits.mplot3d as mplot3d
+mplot3d = pyimport("mpl_toolkits.mplot3d")
 
 function plot_polygon(poly_coords, facecolor, alpha; 
                       edgecolor="none", linestyle="None", linewidth=0.0, kwargs...)
@@ -22,12 +22,12 @@ function plot_polygon(poly_coords, facecolor, alpha;
     for i in 1:length(poly_coords)
         poly_array[i, :] = poly_coords[i]
     end
-    polygon = plt.plt[:Polygon](poly_array, true; facecolor=facecolor, kwargs...)
-    p = ax[:add_patch](polygon)
-    p[:set_edgecolor](edgecolor)
-    p[:set_linestyle](linestyle)
-    p[:set_linewidth](linewidth)
-    p[:set_alpha](alpha)
+    polygon = plt.plt.Polygon(poly_array, true; facecolor=facecolor, kwargs...)
+    p = ax.add_patch(polygon)
+    p.set_edgecolor(edgecolor)
+    p.set_linestyle(linestyle)
+    p.set_linewidth(linewidth)
+    p.set_alpha(alpha)
 end
 
 function plot_buffer(shape, border, color, dist, alpha; kwargs...)
@@ -62,7 +62,7 @@ function plot_schdistr_labels(;fontsize=12.0, labelcolor="black")
             continue
         end
         
-        ax[:annotate](
+        ax.annotate(
             @sprintf("%d", schdistr),
             xy=(center_x, center_y),
             xycoords="data",
@@ -77,7 +77,7 @@ function plot_schdistr_labels(;fontsize=12.0, labelcolor="black")
             zorder=3,
             annotation_clip=true,
         )
-        ax[:annotate](
+        ax.annotate(
             @sprintf("%d", schdistr),
             xy=(center_x, center_y),
             xycoords="data",
@@ -151,9 +151,9 @@ end
 
 function plot_streets(;zoom=11, brighten=30, rgb=(200, 200, 200), zorder=-9)
     ax = plt.gca()
-    ax[:set_autoscale_on](false)
-    ax[:set_autoscalex_on](false)
-    ax[:set_autoscaley_on](false)
+    ax.set_autoscale_on(false)
+    ax.set_autoscalex_on(false)
+    ax.set_autoscaley_on(false)
     EPSG=2263 # projection
     topleft =  (40.75, -74.01)
     botright = (40.58, -73.60)
@@ -261,8 +261,8 @@ function plot_sales(filtered, missing_sqft; edgecolor="black", labelsize=12.0, l
     _xlim = (0.98e6, 1.06e6)
     _ylim = (1.5e5, 2.2e5)
     plt.plot(
-        missing_sqft[:XCoord], 
-        missing_sqft[:YCoord], 
+        missing_sqft[!,:XCoord], 
+        missing_sqft[!,:YCoord], 
         color="white",
         marker="x",
         markersize=1.0,
@@ -272,9 +272,9 @@ function plot_sales(filtered, missing_sqft; edgecolor="black", labelsize=12.0, l
         linewidth=0.1,
         markeredgewidth=0.3,
     )
-    plt.scatter(filtered[:XCoord], 
-        filtered[:YCoord], 
-        c=filtered[:logSalePricePerSQFT],
+    plt.scatter(
+        filtered[!,:XCoord], filtered[!,:YCoord], 
+        c=filtered[!,:logSalePricePerSQFT],
         cmap="jet",
         edgecolors="None",
         zorder=10,
@@ -289,28 +289,28 @@ function plot_sales(filtered, missing_sqft; edgecolor="black", labelsize=12.0, l
     # plt.axis("off")
     # plt.title("log(Property Price per SQFT) in New York")
     ax = plt.gca()
-    ax[:set](aspect="equal", adjustable="box")
-    # ax[:get_xaxis]()[:set_ticks]([])
-    # ax[:get_yaxis]()[:set_ticks]([])
+    ax.set(aspect="equal", adjustable="box")
+    # ax.get_xaxis().set_ticks([])
+    # ax.get_yaxis().set_ticks([])
     plt.xlim(_xlim)
     plt.ylim(_ylim)
     ticks_km(tickdist)
 
-    ax[:set_facecolor]("#B0DAEE")
+    ax.set_facecolor("#B0DAEE")
     if colorbar
         cbar = plt.colorbar(label="Square foot prices (\\\$ per sqft)")
-        ax = cbar[:ax]
+        ax = cbar.ax
         tick_template = [1, 2, 3, 4, 5, 6, 7, 8, 9]
         labeled = [10, 100, 1000, 10^4]
-        ax[:set_yticks](log.(labeled))
-        ax[:set_yticks](log.([tick_template; tick_template.*10; tick_template.*100; tick_template.*1000]), 
+        ax.set_yticks(log.(labeled))
+        ax.set_yticks(log.([tick_template; tick_template.*10; tick_template.*100; tick_template.*1000]), 
                                minor=true)
-        ax[:set_yticklabels]([format(x, commas=true) for x in labeled])
+        ax.set_yticklabels([format(x, commas=true) for x in labeled])
     end
     
-    ax[:set_autoscale_on](false)
-    ax[:set_autoscalex_on](false)
-    ax[:set_autoscaley_on](false)
+    ax.set_autoscale_on(false)
+    ax.set_autoscalex_on(false)
+    ax.set_autoscaley_on(false)
     plot_schdistr_labels(fontsize=labelsize, labelcolor=labelcolor)
 end
 function plot_cliffface(μ, Σ, color; ndraws::Int=10, label=L"posterior of $\tau(x)$ on residuals")
@@ -336,16 +336,16 @@ function plot_cliffface(μ, Σ, color; ndraws::Int=10, label=L"posterior of $\ta
     
     # second y-axis for percentage price increase
     ax = plt.gca()
-    y1, y2=ax[:get_ylim]()
-    x1, x2=ax[:get_xlim]()
-    ax2=ax[:twinx]()
-    ax2[:set_ylim](y1, y2)
+    y1, y2=ax.get_ylim()
+    x1, x2=ax.get_xlim()
+    ax2=ax.twinx()
+    ax2.set_ylim(y1, y2)
     yticks_frac = collect(0.5: 0.1 : 2.0)
     yticks_log = log.(yticks_frac)
     in_window = y1 .< yticks_log .< y2
-    ax2[:set_yticks](yticks_log[in_window])
+    ax2.set_yticks(yticks_log[in_window])
     ylabels = [@sprintf("%.0f\\%%", y*100) for y in yticks_frac[in_window]]
-    ax2[:set_yticklabels](ylabels)
+    ax2.set_yticklabels(ylabels)
     
     plt.sca(ax)
 end
@@ -446,12 +446,12 @@ function plot_cliff(Xb::Matrix, predT_b::Vector, predC_b::Vector)
                      antialiased=false,
                      )
                      
-#     polygon = mplot3d.art3d[:Poly3DCollection]([verts])
-#     polygon[:set_color]("#AAAAAA")
-#     polygon[:set_hatch]("///////")
-#     polygon[:set_edgecolor]("#333333")
-#     polygon[:set_linewidth](0)
-#     plt.gca()[:add_collection3d](polygon)
+#     polygon = mplot3d.art3d.Poly3DCollection([verts])
+#     polygon.set_color("#AAAAAA")
+#     polygon.set_hatch("///////")
+#     polygon.set_edgecolor("#333333")
+#     polygon.set_linewidth(0)
+#     plt.gca().add_collection3d(polygon)
 #     return polygon
     return cliff
 end
@@ -533,22 +533,22 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
     plt.xlabel("Eastings")
     plt.ylabel("Northings")
     plt.zlabel("log Price per SQFT")
-    ax[:view_init](elev=60, azim=230)
-    ax[:set_xticklabels]([])
-    ax[:set_yticklabels]([])
+    ax.view_init(elev=60, azim=230)
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
     _zlim = plt.zlim()
     plt.zticks(ceil(_zlim[1], 1):0.2:floor(_zlim[2]; digits=1))
 #     plt.xlim(xlim)
 #     plt.ylim(ylim)
     
-#     trisurf_T[:set_zsort](3)
-#     cliff[:set_zsort](2)
-#     trisurf_C[:set_zsort](1)
-#     lineT[:set_sort_zpos](3)
-    trisurf_T[:set_sort_zpos](4)
+#     trisurf_T.set_zsort(3)
+#     cliff.set_zsort(2)
+#     trisurf_C.set_zsort(1)
+#     lineT.set_sort_zpos(3)
+    trisurf_T.set_sort_zpos(4)
     for cliff in cliffs
-        cliff[:set_sort_zpos](2)
+        cliff.set_sort_zpos(2)
     end
-    trisurf_C[:set_sort_zpos](1)
-#     lineC[:set_sort_zpos](4)
+    trisurf_C.set_sort_zpos(1)
+#     lineC.set_sort_zpos(4)
 end

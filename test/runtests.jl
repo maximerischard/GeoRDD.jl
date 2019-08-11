@@ -34,6 +34,7 @@ function sim_data(n::Int, τ::Real)
     categorical!(geordd_df, :region)
     return geordd_df, border_X1, border_X2, border_geo
 end
+include("test_geometry.jl")
 include("test_gprealisations.jl")
 include("test_simulated.jl")
 

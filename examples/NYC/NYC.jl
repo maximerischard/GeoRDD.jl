@@ -3,6 +3,7 @@ import GeoJSON
 import Base.convert
 using DataFrames
 using Distributions
+using Printf
 import CSV
 import JSON
 
@@ -29,18 +30,16 @@ end
 
 function read_processed_sales(; data_dir="NYC_data")
     NYC_sales=CSV.read(joinpath(data_dir, "processed", "NYC_sales.csv"), 
-                       DataFrame,
                        types=Dict("TAX CLASS AT PRESENT" => Union{Missings.Missing, String},
                                   "TAX CLASS AT TIME OF SALE" => Union{Missings.Missing, String}),
-                       strings=:raw,
-                       allowmissing=:all,
+                       copycols=true
                       )
-    nyc_schdistrs = CategoricalVector(NYC_sales[:SchDistr])
+    nyc_schdistrs = CategoricalVector(NYC_sales[!, :SchDistr])
     # schd_strings = [ismissing(sd)?missing:dec(sd,2) for sd in  nyc_schdistrs]
     # str_schdistrs = CategoricalVector(schd_strings)
-    NYC_sales[:SchDistr] = nyc_schdistrs
+    NYC_sales[!, :SchDistr] = nyc_schdistrs
     # categorical variables
-    categorical!(NYC_sales, Symbol[
+    categorical!(NYC_sales, Symbol.([
         "BOROUGH",
         "BUILDING CLASS CATEGORY",
         "BUILDING CLASS AT TIME OF SALE",
@@ -48,7 +47,7 @@ function read_processed_sales(; data_dir="NYC_data")
         "TAX CLASS AT PRESENT",
         "TAX CLASS AT TIME OF SALE",
         "NEIGHBORHOOD",
-        ])
+        ]))
     sort!(NYC_sales, :SchDistr)
     return NYC_sales
 end
@@ -150,7 +149,7 @@ const RESIDENTIAL_DICT = Dict(
 
 function filter_sales(NYC_sales::DataFrame)
 
-    logSalePricePerSQFT = log.(NYC_sales[SALE_PRICE]) .- log.(NYC_sales[SQFT])
+    logSalePricePerSQFT = log.(NYC_sales[!,SALE_PRICE]) .- log.(NYC_sales[!,SQFT])
     believable = zeros(Bool, size(NYC_sales,1))
     removed_reason = Dict(
         :residential => 0,
@@ -205,9 +204,9 @@ function filter_sales(NYC_sales::DataFrame)
     end
 
     filtered = copy(NYC_sales[believable,:])
-    filtered[:logSalePricePerSQFT] = convert.(Float64, logSalePricePerSQFT[believable])
+    filtered[!,:logSalePricePerSQFT] = convert.(Float64, logSalePricePerSQFT[believable])
     for col in (:XCoord, :YCoord)
-        filtered[col] = convert.(Float64, filtered[col])
+        filtered[!,col] = convert.(Float64, filtered[!,col])
     end
     return Dict(
         :filtered => filtered,

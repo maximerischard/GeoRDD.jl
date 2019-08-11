@@ -75,7 +75,7 @@ struct GeoRDDFormula
     outcome::Symbol
     spatial_covariates::Vector{Symbol}
     groupindic::Symbol
-    lmformula::Formula
+    lmformula::FormulaTerm
 end
 """
     This (admittedly hacky) function parses a formula intended to specify a GeoRDD.
@@ -85,40 +85,47 @@ end
     Z is the treatment or group indicator, and COVAR1 and COVAR2 are additional
     non-spatial covariates.
 """
-function parse_geordd_formula(fmla::Formula)
+function parse_geordd_formula(fmla::FormulaTerm)
     # We're now going to go on a fishing expedition inside of this formula
     # to pick out the things we need for a GeoRDD.
     local gp_args # what are the spatial coodinate column names?
     local gp_term # what is the bit of the formula that corresponds to the GP?
     local groupindic # what is the group (e.g. treatment/control) indicator column?
-    terms = StatsModels.Terms(fmla)
-    for t in terms.terms
-        evalterms = StatsModels.evt(t)
-        for (i,evterm) in enumerate(evalterms)
-            if StatsModels.is_call(evterm, :GP)
-                # this is the Gaussian Process
-                @assert evterm.args[1] == :GP # sanity check
+    terms = StatsModels.terms(fmla)
+    found = false
+    for t in fmla.rhs # iterate over the RHS of the formula
+        if t isa StatsModels.FunctionTerm
+            left = t.args_parsed[1]
+            if (left isa StatsModels.FunctionTerm) & (nameof(left.forig) == :GP)
+                # this is the Gaussian process
                 # inside the GP(., .) function, pick out the column name
-                # of the spatial coordinates
-                gp_args = Symbol.(evterm.args[2:end])
+                gp_args = Symbol.(left.args_parsed)
                 gp_term = t
-                if length(evalterms) != 2
+                if length(t.args_parsed) != 2
                     throw("The spatial GP should be interacted with a group indicator.")
                 end
-                if t.args[1] != :|
+                if nameof(t.forig) != :|
                     throw("The group indicator should be separated from the GP by |.")
                 end
-                groupindic = [evalterms[j] for j in 1:length(evalterms) if i!=j][1]
+                groupindic = Symbol(t.args_parsed[2])
+                found = true
             end
         end
     end
+    if !found
+        throw("""Error: GP term not found in formula.
+        
+            The syntax for the formula is
+                Y ~ GP(X1, X2) | Z + COVAR1 + COVAR2 + …
+            where Y is the outcome variable, X1 and X2 are the two spatial covariates,
+            Z is the treatment or group indicator, and COVAR1 and COVAR2 are additional
+            non-spatial covariates.
+            """)
+    end
+    Y = Symbol(fmla.lhs)
     # Remove the GP(X1, X2)|indic from the formula so we're just left with a
     # linear model formula:
-    if !isa(fmla.lhs, Symbol)
-        throw("The left hand side should specify the outcome column name")
-    end
-    Y = fmla.lhs
-    lmformula = StatsModels.dropterm(fmla, gp_term)
+    lmformula = StatsModels.drop_term(fmla, gp_term)
     return GeoRDDFormula(Y, gp_args, groupindic, lmformula)
 end
 
@@ -126,9 +133,9 @@ end
 ### Extracting region data from a DataFrames ###
 ################################################
 
-function regions_from_dataframe(df::AbstractDataFrame, outcome::Symbol, groupindic::Symbol, spatial_covariates::Vector{Symbol}, lmformula::Formula)
+function regions_from_dataframe(df::AbstractDataFrame, outcome::Symbol, groupindic::Symbol, spatial_covariates::Vector{Symbol}, lmformula::FormulaTerm)
     contrasts = Dict{Symbol,StatsModels.AbstractContrasts}()
-    for col in StatsModels.Terms(lmformula).eterms
+    for col in Symbol.(StatsModels.terms(lmformula))
         contrasts[col] = StatsModels.FullDummyCoding()
     end
     covars_mf = StatsModels.ModelFrame(lmformula, df, contrasts=contrasts)
@@ -137,7 +144,7 @@ function regions_from_dataframe(df::AbstractDataFrame, outcome::Symbol, groupind
     D = mm.m' # p×n matrix of covariates
     spatialdim = length(spatial_covariates)
 
-    group_col = df[groupindic]
+    group_col = df[!,groupindic]
     groupKeys = DataFrames.levels(group_col)
     KEY = eltype(groupKeys)
     regionDict = Dict{KEY, RegionData}()
@@ -160,7 +167,7 @@ function regions_from_dataframe(df::AbstractDataFrame, outcome::Symbol, groupind
     return regionDict
 end
 
-function regions_from_dataframe(fmla::Formula, df::AbstractDataFrame)
+function regions_from_dataframe(fmla::FormulaTerm, df::AbstractDataFrame)
     parsed = parse_geordd_formula(fmla)
     regions_from_dataframe(df, parsed.outcome, parsed.groupindic, 
                           parsed.spatial_covariates, parsed.lmformula)

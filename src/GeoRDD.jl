@@ -9,7 +9,7 @@ module GeoRDD
     using Distributions: Normal, MultivariateNormal, ccdf, cdf
     using PDMats: AbstractPDMat
     import StatsModels
-    using StatsModels: Formula
+    using StatsModels: FormulaTerm
     import DataFrames
     using DataFrames: DataFrame, AbstractDataFrame
     import NLopt

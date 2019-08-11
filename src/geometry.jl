@@ -2,6 +2,7 @@ using LibGEOS: distance, envelope
 import LibGEOS: interpolate
 using Combinatorics: permutations, combinations
 using GeoInterface: coordinates, xcoord, ycoord
+import Base: convert
 
 # type conversion
 const BorderType = Union{LibGEOS.MultiLineString, LibGEOS.LineString}
@@ -45,6 +46,20 @@ function raw_border(A_T::RegionType, A_C::RegionType, buffer::Float64)
     border = LibGEOS.intersection(A_T_boundary, A_C_buffered)
     return border
 end
+
+"""
+    get_border(A_T::RegionType, A_C::RegionType, [buffer::Float64=0.0])
+
+Obtain the border between two regions. The treatment region (`A_T`)
+and control region (`A_C`) are of type `Polygon` or `MultiPolygon`.
+
+The `buffer` argument controls how much the control region is 
+buffered by (expanded) before it is interesected with the boundary
+of the treatment area. This is useful when adjacent polygons don't have
+perfectly equal corner coordinates; otherwise use `buffer=0`.
+
+The border is then postprocessed to merge and order adjacent segments.
+"""
 function get_border(A_T::RegionType, A_C::RegionType, buffer::Float64)
     if distance(envelope(A_T), envelope(A_C)) > buffer
         return nothing
@@ -56,7 +71,7 @@ function get_border(A_T::RegionType, A_C::RegionType, buffer::Float64)
     if !(typeof(border) <: BorderType)
         return nothing
     end
-    border = GeoRDD.rearrange_lines(border)
+    border = rearrange_lines(border)
     return border
 end
 function get_border(A_T::P1, A_C::P2, buffer::Float64) where {
@@ -66,7 +81,14 @@ function get_border(A_T::P1, A_C::P2, buffer::Float64) where {
     A_C_libgeos = convert(RegionType, A_C)
     return get_border(A_T_libgeos, A_C_libgeos)
 end
+get_border(A_T, A_C) = get_border(A_T, A_C, 0.0)
 
+"""
+    region_grid(region::RegionType, gridspace::Float64)
+
+Obtain a regular grid of points within `region`, with space
+between points controlled by the `gridspace` argument.
+"""
 function region_grid(region::RegionType, gridspace::Float64)
     env = envelope(region)
     env_coord = coordinates(env)[1]
@@ -105,13 +127,13 @@ function merge_adjacent(segments)
                 delete!(point_dict, other_seg[end])
                 if seg[1] == other_seg[1]
                     # two segments have the same start
-                    seg = vcat(reverse(seg), other_seg)
+                    seg = vcat(reverse(seg), other_seg[2:end])
                 elseif seg[end] == other_seg[1]
-                    seg = vcat(seg, other_seg)
+                    seg = vcat(seg, other_seg[2:end])
                 elseif seg[1] == other_seg[end]
-                    seg = vcat(other_seg, seg)
+                    seg = vcat(other_seg[1:end-1], seg)
                 elseif seg[end] == other_seg[end]
-                    seg = vcat(other_seg, reverse(seg))
+                    seg = vcat(other_seg[1:end-1], reverse(seg))
                 else
                     throw("this makes no sense")
                 end
@@ -213,13 +235,23 @@ function dist_orientation(segments, updown)
     end
     return d
 end
+
+""" 
+    Represent a combination as a boolean vector
+    (`true` for indices present in the combination,
+     `false` otherwise)
+"""
+function get_updown(nseg, up)
+    updown = zeros(Bool, nseg)
+    updown[up] .= true
+    return updown
+end
 function best_orientation(segments) 
     nseg = length(segments)
     shortest_updown = zeros(Bool, nseg)
     mindo = dist_orientation(segments, shortest_updown)
     for up in combinations(1:nseg)
-        updown = zeros(Bool, nseg)
-        updown[up] = true
+        updown = get_updown(nseg, up)
         d = dist_orientation(segments, updown)
         if d < mindo
             shortest_updown = updown
@@ -252,6 +284,11 @@ end
 function rearrange_lines(lines::T) where T <: GeoInterface.AbstractMultiLineString
     segments = coordinates(lines)
     ordered = rearrange_lines(segments)
-    return T(ordered)
+    if length(ordered) == 1
+        # type unstable, but better
+        return LibGEOS.LineString(ordered[1])
+    else
+        return T(ordered)
+    end
 end
 
