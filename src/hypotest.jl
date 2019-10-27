@@ -7,7 +7,7 @@ function make_null(gpT::GPE, gpC::GPE)
     # copy parameters from treatment GP
     kNull = gpT.kernel
     mNull = gpT.mean
-    logNoise = gpT.logNoise
+    logNoise = convert(Float64, gpT.logNoise)
     return make_null(gpT, gpC, kNull, mNull, logNoise)
 end
 function prior_rand(gp::GPE)

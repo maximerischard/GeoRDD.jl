@@ -11,6 +11,7 @@ using Distributions: MultivariateNormal
 import GeometricalPredicates
 using VoronoiDelaunay
 import VoronoiDelaunay: getx, gety, DelaunayEdge, DelaunayTriangle
+using Statistics: mean
 
 using PyCall
 mplot3d = pyimport("mpl_toolkits.mplot3d")
@@ -31,8 +32,12 @@ function plot_polygon(poly_coords, facecolor, alpha;
 end
 
 function plot_buffer(shape, border, color, dist, alpha; kwargs...)
-    border_buffer = LibGEOS.buffer(border, dist)
-    shape_buffer = LibGEOS.intersection(border_buffer, shape)            
+    # a buffer zone around the border:
+    border_buffer = LibGEOS.buffer(border, dist) 
+    # prevents a ring self-intersection bug (bad shapefile?):
+    shape_rectified = LibGEOS.buffer(shape, 0.0)
+    # the part of the buffer on the `shape` side of the border:
+    shape_buffer = LibGEOS.intersection(border_buffer, shape_rectified)
     if typeof(shape_buffer) <: LibGEOS.Polygon
         poly_coords = GeoInterface.coordinates(shape_buffer)[1]
         plot_polygon(poly_coords, color, alpha; kwargs...)
@@ -142,9 +147,6 @@ function plot_all_pairs(τpost_pairs::Dict{Tuple{SchDistr,SchDistr}}, regionData
             pricier_shape = shapeA
         end
         plot_buffer(pricier_shape, border, cbbPalette[2], (abs(mean(τpost)) + std(τpost))*scaleup, 1.0, zorder=zorder-1)
-        # if abs(mean(τpost)) > std(τpost)
-            # plot_buffer(pricier_shape, border, "none", (abs(mean(τpost)) - std(τpost))*scaleup, 1.0, zorder=zorder+1, edgecolor="white", linestyle=":", linewidth=1.0)
-        # end
         plot_buffer(pricier_shape, border, cbbPalette[1], abs(mean(τpost))*scaleup, 1.0, zorder=zorder)
     end
 end
@@ -508,7 +510,7 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
     
     distances = .√(diff(Xb_inside[1,:]).^2 + diff(Xb_inside[2,:]).^2)
     med_dist = median(distances)
-    breakpoints = find(distances .> (2*med_dist))
+    breakpoints = findall(distances .> (2*med_dist))
     push!(breakpoints, length(distances)+1)
     cliffs = []
     seg_start=1
@@ -524,8 +526,8 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
         seg_start = seg_end + 1
     end
 
-    centreC = mean(gridC[:,C_inside], 2)
-    centreT = mean(gridT[:,T_inside], 2)
+    centreC = mean(gridC[:,C_inside]; dims=2)
+    centreT = mean(gridT[:,T_inside]; dims=2)
     plt.text3D(centreC[1], centreC[2], predC_b[50], labelC, horizontalalignment="left")
     plt.text3D(centreT[1], centreT[2], predT_b[50], labelT, 
         color="black", fontweight=200, horizontalalignment="right")
@@ -537,7 +539,7 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     _zlim = plt.zlim()
-    plt.zticks(ceil(_zlim[1], 1):0.2:floor(_zlim[2]; digits=1))
+    plt.zticks(ceil(_zlim[1]; digits=1):0.2:floor(_zlim[2]; digits=1))
 #     plt.xlim(xlim)
 #     plt.ylim(ylim)
     
@@ -551,4 +553,30 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
     end
     trisurf_C.set_sort_zpos(1)
 #     lineC.set_sort_zpos(4)
+end
+
+# plotting convenience functions
+function yaxis_right()
+    ax = plt.gca()
+    ax.yaxis.tick_right()
+    ax.yaxis.set_label_position("right")
+end
+function title_in_axis(s, leftright)
+    if leftright == :left
+        plt.text(0.05, 0.95, s,
+             horizontalalignment="left",
+             verticalalignment="top",
+             transform = plt.gca().transAxes)
+    elseif leftright == :right
+        plt.text(0.95, 0.95, s,
+             horizontalalignment="right",
+             verticalalignment="top",
+             transform = plt.gca().transAxes)
+    else
+        throw("left or right?")
+    end
+end
+function hide_xaxis()
+    plt.gca().xaxis.set_ticklabels([])
+    plt.xlabel("")
 end

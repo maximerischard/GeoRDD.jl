@@ -1,8 +1,9 @@
 using PDMats: PDMat
+using GaussianProcesses: make_posdef!
 
 function chistat(gpT::GPE, gpC::GPE, Xb::AbstractMatrix)
-    pred_T = _predict_raw(gpT, Xb)
-    pred_C = _predict_raw(gpC, Xb)
+    pred_T = predict_full(gpT, Xb)
+    pred_C = predict_full(gpC, Xb)
     μ = pred_T[1].-pred_C[1]
     Σ = pred_T[2]+pred_C[2]
     return dot(μ, Σ \ μ)
@@ -37,13 +38,15 @@ function nsim_chi(gpT::GPE, gpC::GPE, gpNull::GPE, Xb::AbstractMatrix, nsim::Int
     cK_T = cov(gpT.kernel, Xb, gpT.x)
     cK_C = cov(gpC.kernel, Xb, gpC.x)
 
-    treat = BitVector(gpNull.nobs)
-    treat[:] = false
-    treat[1:gpT.nobs] = true
+    treat = BitVector(undef, gpNull.nobs)
+    treat[:] .= false
+    treat[1:gpT.nobs] .= true
     kernel = gpT_mod.kernel
     mT = gpT_mod.mean
     mC = gpC_mod.mean
-    t_sims = [sim_chi_null!(gpT_mod, gpC_mod, gpNull, treat, Xb, Σcliff, cK_T, cK_C) 
+    Σraw, chol = make_posdef!(copy(Σcliff))
+    PDcliff = PDMat(Σraw, chol)
+    t_sims = [sim_chi_null!(gpT_mod, gpC_mod, gpNull, treat, Xb, PDcliff, cK_T, cK_C) 
         for _ in 1:nsim];
     return t_sims
 end
@@ -68,5 +71,6 @@ function placebo_chi(angle::Float64, X::AbstractMatrix, Y::Vector,
     return pval
 end
 function placebo_chi(angle::Float64, gp::GPE, nsim::Int; kwargs...)
-    return placebo_chi(angle, gp.x, gp.y, gp.kernel, gp.mean, gp.logNoise, nsim; kwargs...)
+    logNoise = convert(Float64, gp.logNoise)
+    return placebo_chi(angle, gp.x, gp.y, gp.kernel, gp.mean, logNoise, nsim; kwargs...)
 end

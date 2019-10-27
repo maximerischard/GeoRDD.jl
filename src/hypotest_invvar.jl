@@ -1,4 +1,4 @@
-function pval_invvar(gpT::GPE, gpC::GPE, Xb::AbstractMatrix)
+function pval_invvar_uncalib(gpT::GPE, gpC::GPE, Xb::AbstractMatrix)
     μ, Σ = cliff_face(gpT, gpC, Xb)
     invvar = inverse_variance(μ, Σ)
     pval_invvar = 2*min(cdf(invvar, 0.0), ccdf(invvar, 0.0))
@@ -8,7 +8,7 @@ end
 """ 
 With pre-computed cliff-face variance (for simulations with fixed positions).
 """
-function pval_invvar(gpT::GPE, gpC::GPE, Xb::AbstractMatrix, Σcliff::PDMat, cK_T::AbstractMatrix, cK_C::AbstractMatrix)
+function pval_invvar_uncalib(gpT::GPE, gpC::GPE, Xb::AbstractMatrix, Σcliff::PDMat, cK_T::AbstractMatrix, cK_C::AbstractMatrix)
     μT = predict_mu(gpT, Xb, cK_T)
     μC = predict_mu(gpC, Xb, cK_C)
     μ = μT - μC
@@ -17,7 +17,7 @@ function pval_invvar(gpT::GPE, gpC::GPE, Xb::AbstractMatrix, Σcliff::PDMat, cK_
     return pval_invvar
 end
 
-function sim_invvar!(gpT::GPE, gpC::GPE, gpNull::GPE, 
+function sim_invvar_uncalib!(gpT::GPE, gpC::GPE, gpNull::GPE, 
             treat::BitVector, Xb::AbstractMatrix)
     Ysim = prior_rand(gpNull)
 
@@ -27,10 +27,10 @@ function sim_invvar!(gpT::GPE, gpC::GPE, gpNull::GPE,
     update_alpha!(gpT)
     update_alpha!(gpC)
 
-    return pval_invvar(gpT, gpC, Xb)
+    return pval_invvar_uncalib(gpT, gpC, Xb)
 end
 
-function sim_invvar!(gpT::GPE, gpC::GPE, gpNull::GPE, 
+function sim_invvar_uncalib!(gpT::GPE, gpC::GPE, gpNull::GPE, 
             treat::BitVector, Xb::AbstractMatrix, 
             Σcliff::PDMat, cK_T::AbstractMatrix, cK_C::AbstractMatrix)
     Ysim = prior_rand(gpNull)
@@ -41,27 +41,29 @@ function sim_invvar!(gpT::GPE, gpC::GPE, gpNull::GPE,
     update_alpha!(gpT)
     update_alpha!(gpC)
 
-    return pval_invvar(gpT, gpC, Xb, Σcliff, cK_T, cK_C)
+    return pval_invvar_uncalib(gpT, gpC, Xb, Σcliff, cK_T, cK_C)
 end
 
-function nsim_invvar_pval(gpT::GPE, gpC::GPE, Xb::AbstractMatrix, nsim::Int)
+function nsim_invvar_pval_uncalib(gpT::GPE, gpC::GPE, Xb::AbstractMatrix, nsim::Int)
     gpT_mod = modifiable(gpT)
     gpC_mod = modifiable(gpC)
     _, Σcliff = cliff_face(gpT, gpC, Xb)
+    Σraw, chol = make_posdef!(copy(Σcliff))
+    PDcliff = PDMat(Σraw, chol)
     cK_T = cov(gpT.kernel, Xb, gpT.x)
     cK_C = cov(gpC.kernel, Xb, gpC.x)
     gpNull = make_null(gpT, gpC)
-    treat = BitVector(gpNull.nobs)
-    treat[:] = false
-    treat[1:gpT.nobs] = true
-    pval_sims = Float64[sim_invvar!(gpT_mod, gpC_mod, gpNull, treat, Xb, Σcliff, cK_T, cK_C) 
+    treat = BitVector(undef, gpNull.nobs)
+    treat[:] .= false
+    treat[1:gpT.nobs] .= true
+    pval_sims = Float64[sim_invvar_uncalib!(gpT_mod, gpC_mod, gpNull, treat, Xb, PDcliff, cK_T, cK_C) 
         for _ in 1:nsim];
     return pval_sims
 end
 
 function boot_invvar(gpT::GPE, gpC::GPE, Xb::AbstractMatrix, nsim::Int)
-    pval_obs = pval_invvar(gpT, gpC, Xb)
-    pval_sims = nsim_invvar_pval(gpT, gpC, Xb, nsim)
+    pval_obs = pval_invvar_uncalib(gpT, gpC, Xb)
+    pval_sims = nsim_invvar_pval_uncalib(gpT, gpC, Xb, nsim)
     return mean(pval_obs .< pval_sims)
 end
 
@@ -120,10 +122,10 @@ function pval_invvar_calib(gpT::GPE, gpC::GPE, Xb::Matrix, Σcliff::PDMat, cK_T:
     AC_c = KCC \ KCb
     AT = AT_c'
     AC = AC_c'
-    cov_μδ = AT*full(KTT)*AT_c +
-             AC*full(KCC)*AC_c -
-             AC*full(KCT)*AT_c -
-             AT*full(KCT)'*AC_c
+    cov_μδ = AT*Matrix(KTT)*AT_c +
+             AC*Matrix(KCC)*AC_c -
+             AC*Matrix(KCT)*AT_c -
+             AT*Matrix(KCT)'*AC_c
     
     cov_μτ = sum((Σb \ cov_μδ) * (Σb \ ones(n)))
     null = Normal(0.0, √cov_μτ)
@@ -149,9 +151,9 @@ function nsim_invvar_calib(gpT::GPE, gpC::GPE, Xb::AbstractMatrix, nsim::Int)
     gpT_mod = GeoRDD.modifiable(gpT)
     gpC_mod = GeoRDD.modifiable(gpC)
     gpNull = make_null(gpT_mod, gpC_mod)
-    treat = BitVector(gpNull.nobs)
-    treat[:] = false
-    treat[1:gpT.nobs] = true
+    treat = BitVector(undef, gpNull.nobs)
+    treat[:] .= false
+    treat[1:gpT.nobs] .= true
     pval_sims = Float64[sim_invvar_calib!(gpT_mod, gpC_mod, gpNull, treat, Xb) 
         for _ in 1:nsim];
     return pval_sims
@@ -168,5 +170,6 @@ function placebo_invvar(angle::Float64, X::AbstractMatrix, Y::Vector,
     return pval
 end
 function placebo_invvar(angle::Float64, gp::GPE; kwargs...)
-    return placebo_invvar(angle, gp.x, gp.y, gp.kernel, gp.mean, gp.logNoise; kwargs...)
+    logNoise = convert(Float64, gp.logNoise)
+    return placebo_invvar(angle, gp.x, gp.y, gp.kernel, gp.mean, logNoise; kwargs...)
 end

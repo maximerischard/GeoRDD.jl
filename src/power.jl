@@ -35,7 +35,7 @@ function sim_power!(gpT::GPE, gpC::GPE, gpNull::GPE, τ::Float64,
     pval_χ2 = mean(chi_null .> χ2)
     
     # inverse-var
-    pval_invvar_obs = pval_invvar(gpT, gpC, Xb, Σcliff, cK_T, cK_C)
+    pval_invvar_obs = pval_invvar_uncalib(gpT, gpC, Xb, Σcliff, cK_T, cK_C)
 
     invvar_bootcalib = mean(pval_invvar_null .< pval_invvar_obs)
     invvar_calib = pval_invvar_calib(gpT, gpC, Xb, Σcliff, cK_T, cK_C, KCT)
@@ -55,16 +55,18 @@ function nsim_power(gpT::GPE, gpC::GPE, τ::Float64,
     gpNull = make_null(gpT_mod, gpC_mod)
 
     _, Σcliff = cliff_face(gpT, gpC, Xb)
+    Σraw, chol = make_posdef!(copy(Σcliff))
+    PDcliff = PDMat(Σraw, chol)
     cK_T = cov(gpT.kernel, Xb, gpT.x)
     cK_C = cov(gpC.kernel, Xb, gpC.x)
     KCT = cov(gpC.kernel, gpC.x, gpT.x)
 
-    treat = BitVector(gpNull.nobs)
-    treat[:] = false
-    treat[1:gpT.nobs] = true
+    treat = BitVector(undef, gpNull.nobs)
+    treat[:] .= false
+    treat[1:gpT.nobs] .= true
     power_sims = [sim_power!(gpT_mod, gpC_mod, gpNull, τ, treat, Xb, 
                             chi_null, mll_null, pval_invvar_null,
-                            Σcliff, cK_T, cK_C, KCT
+                            PDcliff, cK_T, cK_C, KCT
                            )
                   for _ in 1:nsim];
     return power_sims

@@ -4,27 +4,12 @@ function predict_mu(gp::GPE, X::AbstractMatrix, cK::AbstractMatrix)
     return mu
 end
 
-function _predict_raw(gp::GPE, X::AbstractMatrix)
-    crossdata = KernelData(gp.kernel, gp.x, X)
-    priordata = KernelData(gp.kernel, X, X)
-    cK = cov(gp.kernel, gp.x, X, crossdata)
-    mu = mean(gp.mean, X) + cK'*gp.alpha        # Predictive mean
-    Lck = whiten!(gp.cK, cK)
-    Sigma_raw = cov(gp.kernel, X, X, priordata)
-    # Sigma_raw = Sigma_raw - Lck'Lck
-    LinearAlgebra.BLAS.syrk!('U', 'T', -1.0, Lck, 1.0, Sigma_raw)
-    LinearAlgebra.copytri!(Sigma_raw, 'U')
-    return mu, Sigma_raw
-end
-
 """ Copy of a Gaussian process that shares X and cK but allows
     modification of the outcomes Y. This is useful for bootstrapping.
 """
 function modifiable(gp::GPE)
-    gp_copy = GPE(gp.mean, gp.kernel, gp.logNoise, gp.nobs,
-        gp.x, copy(gp.y), gp.data,
-        gp.dim, gp.cK, copy(gp.alpha),
-        gp.mll, gp.mll, Float64[], Float64[])
+    gp_copy = GPE(gp.x, copy(gp.y), gp.mean, gp.kernel, 
+                  gp.logNoise, gp.covstrat, gp.data, gp.cK)
     return gp_copy
 end
 function update_alpha!(gp::GPE)
@@ -63,4 +48,3 @@ function update_chol!(pd::PDMats.PDMat)
     new_pd = wrap_cK(pd, Σbuffer, chol)
     return new_pd
 end
-

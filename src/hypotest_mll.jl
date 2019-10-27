@@ -21,9 +21,9 @@ end
 function nsim_logP(gpT::GPE, gpC::GPE, gpNull::GPE, nsim::Int)
     gpT_mod = modifiable(gpT)
     gpC_mod = modifiable(gpC)
-    treat = BitVector(gpNull.nobs)
-    treat[:] = false
-    treat[1:gpT.nobs] = true
+    treat = BitVector(undef, gpNull.nobs)
+    treat[:] .= false
+    treat[1:gpT.nobs] .= true
     mll_sims = [sim_logP!(gpT_mod, gpC_mod, gpNull, treat) 
         for _ in 1:nsim];
     return mll_sims
@@ -55,5 +55,6 @@ function placebo_mll(angle::Float64, X::Matrix, Y::Vector,
     return pval
 end
 function placebo_mll(angle::Float64, gp::GPE, nsim::Int; kwargs...)
-    return placebo_mll(angle, gp.x, gp.y, gp.kernel, gp.m, gp.logNoise, nsim; kwargs...)
+    logNoise = convert(Float64, gp.logNoise)
+    return placebo_mll(angle, gp.x, gp.y, gp.kernel, gp.mean, logNoise, nsim; kwargs...)
 end

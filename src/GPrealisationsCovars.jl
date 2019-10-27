@@ -9,6 +9,7 @@ mutable struct MultiGPCovars{KEY,BETA<:Kernel}
     nobs::Int
     # logNoise::Scalar
     logNoise::Float64
+    covstrat::CovarianceStrategy
     mean::Mean
     kernel::Kernel
     βkern::BETA
@@ -39,13 +40,26 @@ mutable struct MultiGPCovars{KEY,BETA<:Kernel}
         length(groupKeys) == length(groupIndices) || throw("groupKeys and groupIndices should have same length")
         length(groupKeys) == length(mgp) || throw("groupKeys and mgp should have same length")
         βdata=KernelData(βkern, D, D)
-        mgpcv = new(D, y, groupKeys, mgp, groupIndices, p, dim, nobs, logNoise, mean, kernel, βkern, βdata)
+        covstrat = FullCovariance()
+        mgpcv = new(D, y, groupKeys, mgp, groupIndices, p, dim, nobs, logNoise, 
+                    covstrat, mean, kernel, βkern, βdata)
         propagate_params!(mgpcv)
         initialise_mll!(mgpcv)
         return mgpcv
     end
 end
 const MultiGPLinReg = MultiGPCovars{KEY,BETA} where {KEY,BETA<:LinIso}
+
+function MultiGPCovars{KEY,BETA}(D, y, groupKeys,
+        mgp, groupIndices,
+        p::Int, dim::Int, nobs::Int, 
+        logNoise::Scalar,
+        mean, kernel, βkern) where {KEY,BETA}
+    return MultiGPCovars{KEY,BETA}(D, y, groupKeys, mgp, groupIndices,
+                         p, dim, nobs,
+                         convert(Float64, logNoise),
+                         mean, kernel, βkern)
+end
 
 function MultiGPCovars(Dlist::Vector{M}, gpList::Vector{GPE}, groupKeys::Vector{KEY}, βkern::Kernel) where {M<:AbstractMatrix{Float64}, KEY}
     total_nobs = sum([gp.nobs for gp in gpList])
@@ -158,19 +172,21 @@ function update_mll_and_dmll!(
     if kern
         dmll_k = @view(dmll[i:i+n_kern_params-1])
         fill!(dmll_k, 0.0)
+        dmll_k_gp = Vector{Float64}(undef, n_kern_params)
         for key in mgpcv.groupKeys
             gp = mgpcv.mgp[key]
             slice = mgpcv.groupIndices[key]
-            ααview = view(ααinvcKI, slice, slice)
-            dmll_k_gp = Vector{Float64}(undef, n_kern_params)
-            dmll_kern!(dmll_k_gp, gp.kernel, gp.x, gp.data, ααview)
+            # ααview = view(ααinvcKI, slice, slice)
+            precomp = FullCovariancePrecompute(ααinvcKI[slice,slice])
+            # dmll_kern!(dmll_k_gp, gp.kernel, gp.x, gp.data, ααview, mgpcv.covstrat)
+            dmll_kern!(dmll_k_gp, gp, precomp, mgpcv.covstrat)
             dmll_k .+= dmll_k_gp
         end
         i += n_kern_params
     end
     if beta
         dmll_β = @view(dmll[i:end])
-        dmll_kern!(dmll_β, mgpcv.βkern, mgpcv.D, mgpcv.βdata, ααinvcKI)
+        dmll_kern!(dmll_β, mgpcv.βkern, mgpcv.D, mgpcv.βdata, ααinvcKI, mgpcv.covstrat)
         i+=1
     end
     mgpcv.dmll = dmll

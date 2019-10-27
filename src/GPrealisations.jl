@@ -1,16 +1,3 @@
-using Statistics
-import GaussianProcesses: update_mll!, update_mll_and_dmll!, 
-                          get_params, set_params!, num_params,
-                          optimize!, GPE
-using GaussianProcesses: grad_stack, grad_stack!, grad_slice!, get_ααinvcKI!,
-                         Mean, Kernel, KernelData, LinIso, MeanZero,
-                         cov!, cov, cov_ij, dmll_kern!,
-                         mat, cholfactors, wrap_cK, make_posdef!, Scalar
-using PDMats
-using LinearAlgebra
-using GaussianProcesses
-import Optim
-
 mutable struct GPRealisations{KEY}
     groupKeys::Vector{KEY}
     mgp::Dict{KEY,GPE}
@@ -30,12 +17,6 @@ mutable struct GPRealisations{KEY}
         update_mll!(gpreals)
         return gpreals
     end
-    # function GPRealisations{KEY}(
-            # groupKeys::Vector{KEY}, mgp::Dict{KEY,GPE}, nobs::Int, logNoise::Real,
-            # mean::Mean, kernel::Kernel) where {KEY}
-        # ln = Scalar(logNoise)
-        # GPRealisations{KEY}(groupKeys, mgp, nobs, ln, mean, kernel)
-    # end
 end
 function GPRealisations(gpList::Vector{GPE}, groupKeys::Vector{KEY}) where {KEY}
     total_nobs = sum([gp.nobs for gp in gpList])
@@ -61,6 +42,12 @@ function GPRealisations(gpList::Vector{GPE}, groupKeys::Vector{KEY}) where {KEY}
                 groupKeys, gpDict, 
                 total_nobs, logNoise, mean, kern)
     return gpreals
+end
+function GPRealisations{KEY}(groupKeys, mgp, nobs,
+        logNoise::Scalar, mean, kernel) where {KEY}
+    logNoise_float = convert(Float64, logNoise)
+    return GPRealisations{KEY}(groupKeys, mgp, nobs,
+            logNoise_float, mean, kernel)
 end
 
 Base.getindex(gpreals::GPRealisations{KEY}, key::KEY) where {KEY} = gpreals.mgp[key]
