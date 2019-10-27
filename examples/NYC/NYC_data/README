@@ -1,10 +1,17 @@
-MapPluto:
+# MapPluto:
 > MapPLUTO merges PLUTO tax lot data with tax lot features from the Department of Finance’s Digital Tax Map (DTM), clipped to the shoreline. It contains extensive land use and geographic data at the tax lot level in ESRI shape file format and dbase table format.
 Downloaded from http://www1.nyc.gov/site/planning/data-maps/open-data/dwn-pluto-mappluto.page#mappluto
-Sales data:
+
+# Sales data:
 > The Department of Finance’s Rolling Sales files lists properties that sold in the last twelve-month period in New York City for all tax classes. These files include:
 * the neighborhood;
 * building type;
 * square footage;
 * other data.
 Download from http://www1.nyc.gov/site/finance/taxes/property-rolling-sales-data.page
+
+# School district boundaries
+
+The shapes of the NYC school district boundaries for 2016 are in `nysd_16c/nysd.json` in
+the geojson format.
+Downloaded from https://www1.nyc.gov/site/planning/data-maps/open-data/districts-download-metadata.page
