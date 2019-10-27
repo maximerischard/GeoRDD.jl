@@ -11,11 +11,11 @@ using LinearAlgebra
 function run_simulation()
     Random.seed!(1) # for replicability
     τ = 0.3 # constant treatment effect
-    geordd_df, border_X1, border_X2, border_geo = sim_data(300, τ)
+    geordd_df, border_X1, border_X2, border_geo = sim_data(1000, τ)
     fmla = @formula(outcome ~ GP(X1, X2) | region + covarA + covarB + categ)
     geordd = GeoRDD.regions_from_dataframe(fmla, geordd_df)
     # choose a Gaussian process kernel from the GaussianProcesses.jl package
-    k_se = SEIso(log(0.5), log(1.0)) # Squared Exponential spatial kernel
+    k_se = SEIso(log(0.3), log(1.0)) # Squared Exponential spatial kernel
     k_m = Const(log(20.0))           # constant kernel for the mean parameters
     βkern = LinIso(log(1.0))         # linear kernel for the other covariates
     logNoise = 1.0
