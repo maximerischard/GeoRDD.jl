@@ -6,23 +6,40 @@ using Distributions
 using Printf
 import CSV
 import JSON
+import Proj4
+import Proj4: transform
 
 import GeoInterface
+using GeoInterface: features, coordinates, geometry, properties
 
 const SchDistr = Int
 
-const SALE_PRICE = Symbol("SALE PRICE")
-const SQFT = Symbol("GROSS SQUARE FEET")
-const BUILDING_CLASS_AT_TIME_OF_SALE = Symbol("BUILDING CLASS AT TIME OF SALE")
-const BUILDING_CLASS_CATEGORY = Symbol("BUILDING CLASS CATEGORY")
-const TAX_CLASS_AT_TIME_OF_SALE = Symbol("TAX CLASS AT TIME OF SALE")
+const SALE_PRICE = Symbol("SALE_PRICE")
+const SQFT = Symbol("GROSS_SQUARE_FEET")
+const BUILDING_CLASS_AT_TIME_OF_SALE = Symbol("BUILDING_CLASS_AT_TIME_OF_SALE")
+const BUILDING_CLASS_CATEGORY = Symbol("BUILDING_CLASS_CATEGORY")
+const TAX_CLASS_AT_TIME_OF_SALE = Symbol("TAX_CLASS_AT_TIME_OF_SALE")
 
-function read_distr_shapes(; data_dir="NYC_data")
-    json=GeoJSON.parsefile(joinpath(data_dir, "nysd_16c", "nysd.json"))
+function transform(src::Proj4.Projection, dest::Proj4.Projection, multicoords::AbstractVector{V} where V<:AbstractVector)
+    return transform.(Ref(src), Ref(dest), multicoords)
+end
+function transform(src, dist, p::Missing) missing end
+function transform(src, dist, geom::G) where G<:GeoInterface.AbstractGeometry
+    G(transform(src, dist, coordinates(geom)))
+end
+function transform_epsg(coords; epsg_from::Int, epsg_to::Int)
+    proj_from = Proj4.Projection(Proj4.epsg[epsg_from])
+    proj_to = Proj4.Projection(Proj4.epsg[epsg_to])
+    return transform(proj_from, proj_to, coords)
+end
+
+function read_distr_shapes(; data_dir="NYC_data", epsg_from::Int=4326, epsg_to::Int=2263)
+    nysd_json = GeoJSON.parsefile(joinpath(data_dir, "nysd_16c", "nysd.json"))
     schdistr_shape_dict = Dict{SchDistr, GeoRDD.RegionType}()
-    for feature in json.features
-        schdistr = convert(SchDistr, feature.properties["SchoolDist"])
-        shape = convert(GeoRDD.RegionType, feature.geometry)
+    for feature in features(nysd_json)
+        schdistr = convert(SchDistr, properties(feature)["SchoolDist"])
+        projected_geom = transform_epsg(geometry(feature); epsg_from=epsg_from, epsg_to=epsg_to)
+        shape = convert(GeoRDD.RegionType, projected_geom)
         schdistr_shape_dict[schdistr] = shape
     end
     return schdistr_shape_dict
@@ -39,15 +56,15 @@ function read_processed_sales(; data_dir="NYC_data")
     # str_schdistrs = CategoricalVector(schd_strings)
     NYC_sales[!, :SchDistr] = nyc_schdistrs
     # categorical variables
-    categorical!(NYC_sales, Symbol.([
-        "BOROUGH",
-        "BUILDING CLASS CATEGORY",
-        "BUILDING CLASS AT TIME OF SALE",
-        "ZIP CODE",
-        "TAX CLASS AT PRESENT",
-        "TAX CLASS AT TIME OF SALE",
-        "NEIGHBORHOOD",
-        ]))
+    categorical!(NYC_sales, [
+        :BOROUGH,
+        :BUILDING_CLASS_CATEGORY,
+        :BUILDING_CLASS_AT_TIME_OF_SALE,
+        :ZIP_CODE,
+        :TAX_CLASS_AT_PRESENT,
+        :TAX_CLASS_AT_TIME_OF_SALE,
+        :NEIGHBORHOOD,
+        ])
     sort!(NYC_sales, :SchDistr)
     return NYC_sales
 end
@@ -75,6 +92,7 @@ const DWELLINGS_DICT = Dict(
     "21  OFFICE BUILDINGS"=>false,
     "22  STORE BUILDINGS"=>false,
     "23  LOFT BUILDINGS"=>false,
+    "24  TAX CLASS 4 - UTILITY BUREAU PROPERTIES"=>false,
     "25  LUXURY HOTELS"=>false,
     "26  OTHER HOTELS"=>false,
     "27  FACTORIES"=>false,
@@ -89,6 +107,8 @@ const DWELLINGS_DICT = Dict(
     "36  OUTDOOR RECREATIONAL FACILITIES"=>false,
     "37  RELIGIOUS FACILITIES"=>false,
     "38  ASYLUMS AND HOMES"=>false,
+    "39  TRANSPORTATION FACILITIES"=>false,
+    "40  SELECTED GOVERNMENTAL FACILITIES"=>false,
     "41  TAX CLASS 4 - OTHER"=>false,
     "42  CONDO CULTURAL/MEDICAL/EDUCATIONAL/ETC"=>false,
     "43  CONDO OFFICE BUILDINGS"=>false,
@@ -122,6 +142,7 @@ const RESIDENTIAL_DICT = Dict(
     "21  OFFICE BUILDINGS"=>false,
     "22  STORE BUILDINGS"=>false,
     "23  LOFT BUILDINGS"=>false,
+    "24  TAX CLASS 4 - UTILITY BUREAU PROPERTIES"=>false,
     "25  LUXURY HOTELS"=>false,
     "26  OTHER HOTELS"=>false,
     "27  FACTORIES"=>false,
@@ -136,6 +157,8 @@ const RESIDENTIAL_DICT = Dict(
     "36  OUTDOOR RECREATIONAL FACILITIES"=>false,
     "37  RELIGIOUS FACILITIES"=>false,
     "38  ASYLUMS AND HOMES"=>false,
+    "39  TRANSPORTATION FACILITIES"=>false,
+    "40  SELECTED GOVERNMENTAL FACILITIES"=>false,
     "41  TAX CLASS 4 - OTHER"=>false,
     "42  CONDO CULTURAL/MEDICAL/EDUCATIONAL/ETC"=>false,
     "43  CONDO OFFICE BUILDINGS"=>false,
