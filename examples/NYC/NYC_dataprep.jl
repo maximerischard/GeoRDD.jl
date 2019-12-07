@@ -13,6 +13,7 @@ import DBFTables
 import ExcelFiles
 import ExcelReaders
 import Statistics
+import Proj4
 using DocOpt  # import docopt function
 
 function main()
@@ -81,6 +82,10 @@ function read_sales_df(filepath)
                    :COMMERCIAL_UNITS, :TOTAL_UNITS, :YEAR_BUILT)
         sales_df[!,intkey] = convert.(Int, sales_df[!,intkey])
     end
+    for zeronullkey in (:LAND_SQUARE_FEET, :GROSS_SQUARE_FEET, :COMMERCIAL_UNITS, 
+                        :TOTAL_UNITS, :RESIDENTIAL_UNITS, :SALE_PRICE, :YEAR_BUILT)
+        sales_df[!,zeronullkey] = [x==0 ? missing : x for x in sales_df[!,zeronullkey]]
+    end
     for alphanumkey in (:TAX_CLASS_AT_PRESENT, :APARTMENT_NUMBER)
         sales_df[!,alphanumkey] = fix_alphanumeric_type.(sales_df[!,alphanumkey])
     end
@@ -100,6 +105,20 @@ struct TaxInfo
     address::Union{String, Missing}
 end
 
+function Proj4.transform(src::Proj4.Projection, dest::Proj4.Projection, multicoords::AbstractVector{V} where V<:AbstractVector)
+    return Proj4.transform.(Ref(src), Ref(dest), multicoords)
+end
+function Proj4.transform(src, dist, p::Shapefile.Point) Proj4.transform(src, dist, [p.x, p.y]) end
+function Proj4.transform(src, dist, p::Missing) missing end
+function Proj4.transform{G where G<:GeoInterface.AbstractGeometry}(src, dist, geom::G)
+    G(Proj4.transform(src, dist, GeoInterface.coordinates(geom)))
+end
+function transform_epsg(coords; epsg_from::Int, epsg_to::Int)
+    proj_from = Proj4.Projection(Proj4.epsg[epsg_from])
+    proj_to = Proj4.Projection(Proj4.epsg[epsg_to])
+    return Proj4.transform(proj_from, proj_to, coords)
+end
+
 function sbl_to_taxinfo_pairs_from_shapefile(filepath)
     # read shapefile
     table = Shapefile.Table(filepath)
@@ -111,11 +130,12 @@ function sbl_to_taxinfo_pairs_from_shapefile(filepath)
     address = [ismissing(st_nbr) ? missing : st_nbr*" "*street*", "*zipcode
                for (st_nbr, street, zipcode) 
                in zip(table.LOC_ST_NBR, table.LOC_STREET, table.LOC_ZIP)]
+    projected_points = transform_epsg(points; epsg_from=26918, epsg_to=2263)
     info = [TaxInfo(ismissing(p) ? missing : p.x,
                   ismissing(p) ? missing : p.y,
                   s, addr)
           for (p, s, addr)
-          in zip(points, sch_code, address)]
+          in zip(projected_points, sch_code, address)]
     # create a vector of pairs of SBL codes and points
     sbl_to_taxinfo_pairs = zip(table.SBL, info)
     return sbl_to_taxinfo_pairs
