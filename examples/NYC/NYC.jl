@@ -23,7 +23,6 @@ const TAX_CLASS_AT_TIME_OF_SALE = Symbol("TAX_CLASS_AT_TIME_OF_SALE")
 function transform(src::Proj4.Projection, dest::Proj4.Projection, multicoords::AbstractVector{V} where V<:AbstractVector)
     return transform.(Ref(src), Ref(dest), multicoords)
 end
-function transform(src, dist, p::Missing) missing end
 function transform(src, dist, geom::G) where G<:GeoInterface.AbstractGeometry
     G(transform(src, dist, coordinates(geom)))
 end
