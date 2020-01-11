@@ -16,7 +16,7 @@ using Statistics: mean
 using PyCall
 mplot3d = pyimport("mpl_toolkits.mplot3d")
 
-function plot_polygon(poly_coords, facecolor, alpha; 
+function plot_polygon(poly_coords, facecolor, alpha;
                       edgecolor="none", linestyle="None", linewidth=0.0, kwargs...)
     ax = plt.gca()
     poly_array = Array{Float64}(undef, length(poly_coords), 2)
@@ -33,7 +33,7 @@ end
 
 function plot_buffer(shape, border, color, dist, alpha; kwargs...)
     # a buffer zone around the border:
-    border_buffer = LibGEOS.buffer(border, dist) 
+    border_buffer = LibGEOS.buffer(border, dist)
     # prevents a ring self-intersection bug (bad shapefile?):
     shape_rectified = LibGEOS.buffer(shape, 0.0)
     # the part of the buffer on the `shape` side of the border:
@@ -60,13 +60,13 @@ function plot_schdistr_labels(;fontsize=12.0, labelcolor="black")
     ax = plt.gca()
     for schdistr in keys(schdistr_represent)
         center_x, center_y = schdistr_represent[schdistr]
-        
+
         if !(xmin < center_x < xmax)
             continue
         elseif !(ymin < center_y < ymax)
             continue
         end
-        
+
         ax.annotate(
             @sprintf("%d", schdistr),
             xy=(center_x, center_y),
@@ -182,7 +182,7 @@ function plot_streets(;zoom=11, brighten=30, rgb=(200, 200, 200), zorder=-9)
         x0_epsg, y0_epsg = epsg_proj(x0_ll, y0_ll)
         x1_epsg, y1_epsg = epsg_proj(x1_ll, y1_ll)
         return x0_epsg, x1_epsg, y0_epsg, y1_epsg
-        
+
     def brighten(img, factor):
         # split the image into individual bands
         source = img.split()
@@ -247,14 +247,14 @@ end
 function plot_sales(filtered, missing_sqft; edgecolor="black", labelsize=12.0, labelcolor="black", colorbar=true, tickdist=5.0)
     fig=plt.figure()
     background_schdistrs(plt.gca(),
-                color="#AAAAAA", 
+                color="#AAAAAA",
                 edgecolor=edgecolor,
                 alpha=1.0,
                 linestyle="-",
                 zorder=-10
                 )
     background_schdistrs(plt.gca(),
-                color="none", 
+                color="none",
                 edgecolor=edgecolor,
                 alpha=1.0,
                 linestyle="-",
@@ -263,8 +263,8 @@ function plot_sales(filtered, missing_sqft; edgecolor="black", labelsize=12.0, l
     _xlim = (0.98e6, 1.06e6)
     _ylim = (1.5e5, 2.2e5)
     plt.plot(
-        missing_sqft[!,:XCoord], 
-        missing_sqft[!,:YCoord], 
+        missing_sqft[!,:XCoord],
+        missing_sqft[!,:YCoord],
         color="white",
         marker="x",
         markersize=1.0,
@@ -275,7 +275,7 @@ function plot_sales(filtered, missing_sqft; edgecolor="black", labelsize=12.0, l
         markeredgewidth=0.3,
     )
     plt.scatter(
-        filtered[!,:XCoord], filtered[!,:YCoord], 
+        filtered[!,:XCoord], filtered[!,:YCoord],
         c=filtered[!,:logSalePricePerSQFT],
         cmap="jet",
         edgecolors="None",
@@ -305,11 +305,11 @@ function plot_sales(filtered, missing_sqft; edgecolor="black", labelsize=12.0, l
         tick_template = [1, 2, 3, 4, 5, 6, 7, 8, 9]
         labeled = [10, 100, 1000, 10^4]
         ax.set_yticks(log.(labeled))
-        ax.set_yticks(log.([tick_template; tick_template.*10; tick_template.*100; tick_template.*1000]), 
+        ax.set_yticks(log.([tick_template; tick_template.*10; tick_template.*100; tick_template.*1000]),
                                minor=true)
         ax.set_yticklabels([format(x, commas=true) for x in labeled])
     end
-    
+
     ax.set_autoscale_on(false)
     ax.set_autoscalex_on(false)
     ax.set_autoscaley_on(false)
@@ -318,13 +318,13 @@ end
 function plot_cliffface(μ, Σ, color; ndraws::Int=10, label=L"posterior of $\tau(x)$ on residuals")
     plt.plot(μ, color=color, ".", label=label)
     msize=10
-    plt.plot(1,μ[1], color=cbbPalette[5], 
+    plt.plot(1,μ[1], color=cbbPalette[5],
         markersize=msize, marker="o")
-    plt.plot(length(μ),μ[end], color=cbbPalette[4], 
+    plt.plot(length(μ),μ[end], color=cbbPalette[4],
         markersize=msize, marker="o")
     posterior_sd = sqrt.(diag(Σ))
-    plt.fill_between(1:length(μ), μ.-2*posterior_sd, μ.+2*posterior_sd, 
-        color=color, 
+    plt.fill_between(1:length(μ), μ.-2*posterior_sd, μ.+2*posterior_sd,
+        color=color,
         alpha=0.3,
         linewidth=0,
         zorder=-2,
@@ -335,7 +335,7 @@ function plot_cliffface(μ, Σ, color; ndraws::Int=10, label=L"posterior of $\ta
     end
     plt.xlim(1,length(μ))
     plt.ylim(minimum(μ.-2*posterior_sd), maximum(μ.+2*posterior_sd))
-    
+
     # second y-axis for percentage price increase
     ax = plt.gca()
     y1, y2=ax.get_ylim()
@@ -348,7 +348,7 @@ function plot_cliffface(μ, Σ, color; ndraws::Int=10, label=L"posterior of $\ta
     ax2.set_yticks(yticks_log[in_window])
     ylabels = [@sprintf("%.0f\\%%", y*100) for y in yticks_frac[in_window]]
     ax2.set_yticklabels(ylabels)
-    
+
     plt.sca(ax)
 end
 
@@ -382,19 +382,19 @@ function trisurf_custom_delaunay(grid::Matrix, domain)
 
     points = [IndexablePoint(transform_x(grid[1,i]), transform_y(grid[2,i]), i) for i in 1:size(grid,2)]
     push!(tess, points)
-    
+
     # get minimum triangle areas
     areas = Float64[]
     centres = LibGEOS.Point[]
     for tri in tess
         area = GeometricalPredicates.area(tri)
-        centre = GeometricalPredicates.centroid(tri) 
+        centre = GeometricalPredicates.centroid(tri)
         centre_LibGEOS = LibGEOS.Point(inverse_x(getx(centre)), inverse_y(gety(centre)))
         push!(centres, centre_LibGEOS)
         push!(areas, area)
     end
     medarea = median(areas)
-    
+
     # build up triangle indices
     triangle_indices = Tuple{Int,Int,Int}[]
     for tri in tess
@@ -403,7 +403,7 @@ function trisurf_custom_delaunay(grid::Matrix, domain)
             # skip triangles that are too big
             continue
         end
-        
+
         centre = GeometricalPredicates.centroid(tri)
         centre_LibGEOS = LibGEOS.Point(inverse_x(getx(centre)), inverse_y(gety(centre)))
         if !LibGEOS.within(centre_LibGEOS, domain)
@@ -436,8 +436,8 @@ function plot_cliff(Xb::Matrix, predT_b::Vector, predC_b::Vector)
     # verts_C = collect(zip(Xb[1,:], Xb[2,:], predC_b.+1e-4))
     # verts = [verts_T; verts_C[end:-1:1]]
     n_b = length(predT_b)
-    cliff = plt.plot_surface([Xb[1,:] Xb[1,:]], 
-                     [Xb[2,:] Xb[2,:]], 
+    cliff = plt.plot_surface([Xb[1,:] Xb[1,:]],
+                     [Xb[2,:] Xb[2,:]],
                      [(predT_b.-0.001) (predC_b.+0.001)],
 #                      [(ones(n_b)*5.0) (ones(n_b)*5.7)],
                      shade=true,
@@ -447,7 +447,7 @@ function plot_cliff(Xb::Matrix, predT_b::Vector, predC_b::Vector)
                      linewidth=0,
                      antialiased=false,
                      )
-                     
+
 #     polygon = mplot3d.art3d.Poly3DCollection([verts])
 #     polygon.set_color("#AAAAAA")
 #     polygon.set_hatch("///////")
@@ -457,7 +457,7 @@ function plot_cliff(Xb::Matrix, predT_b::Vector, predC_b::Vector)
 #     return polygon
     return cliff
 end
-function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb, regionT, regionC; 
+function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb, regionT, regionC;
                         xlim=(-Inf, Inf), ylim=(-Inf, Inf), labelT="", labelC="")
     trisurf_X = vcat(@view(gridT[1,:]), @view(gridC[1,:]))
     trisurf_Y = vcat(@view(gridT[2,:]), @view(gridC[2,:]))
@@ -467,14 +467,14 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
     bY_inside = ylim[1] .<= Xb[2,:] .<= ylim[2]
     b_inside = bX_inside .& bY_inside
     Xb_inside = Xb[:, b_inside]
-    
+
     min_b = min(minimum(predT_b[b_inside]),minimum(predC_b[b_inside])) - 0.1
     max_b = max(maximum(predT_b[b_inside]),maximum(predC_b[b_inside])) + 0.1
 
     TX_inside = xlim[1] .<= gridT[1,:] .<= xlim[2]
     TY_inside = ylim[1] .<= gridT[2,:] .<= ylim[2]
     T_inside = TX_inside .& TY_inside
-    
+
     gridT_augmented = hcat(@view(gridT[:,T_inside]), @view(Xb[:,b_inside]))
     trianglesT = trisurf_custom_delaunay(gridT_augmented, regionT)
     trisurf_T = plt.plot_trisurf(
@@ -485,10 +485,10 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
        linewidth=0,
        cmap=plt.cm_get_cmap("jet"),
        vmin=min_b,
-       vmax=max_b, 
+       vmax=max_b,
        alpha=1.0
        )
-       
+
     CX_inside = xlim[1] .<= gridC[1,:] .<= xlim[2]
     CY_inside = ylim[1] .<= gridC[2,:] .<= ylim[2]
     C_inside = CX_inside .& CY_inside
@@ -507,7 +507,7 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
        vmax=max_b,
        alpha=1.0
        )
-    
+
     distances = .√(diff(Xb_inside[1,:]).^2 + diff(Xb_inside[2,:]).^2)
     med_dist = median(distances)
     breakpoints = findall(distances .> (2*med_dist))
@@ -518,8 +518,8 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
         seg_end = breakpoints[isegment]
         seg_indices = seg_start:seg_end
         if length(seg_indices) > 2
-            cliff = plot_cliff(Xb_inside[:,seg_indices], 
-                               predT_b[b_inside][seg_indices], 
+            cliff = plot_cliff(Xb_inside[:,seg_indices],
+                               predT_b[b_inside][seg_indices],
                                predC_b[b_inside][seg_indices])
             push!(cliffs, cliff)
         end
@@ -528,8 +528,11 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
 
     centreC = mean(gridC[:,C_inside]; dims=2)
     centreT = mean(gridT[:,T_inside]; dims=2)
-    plt.text3D(centreC[1], centreC[2], predC_b[50], labelC, horizontalalignment="left")
-    plt.text3D(centreT[1], centreT[2], predT_b[50], labelT, 
+    maxpredC = maximum(predgridC[C_inside])
+    maxpredT = maximum(predgridT[T_inside])
+    plt.text3D(centreC[1], centreC[2], maxpredC, labelC,
+        color="black", fontweight=200, horizontalalignment="left")
+    plt.text3D(centreT[1], centreT[2], maxpredT, labelT,
         color="black", fontweight=200, horizontalalignment="right")
     ax=plt.gca()
     plt.xlabel("Eastings")
@@ -542,7 +545,7 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
     plt.zticks(ceil(_zlim[1]; digits=1):0.2:floor(_zlim[2]; digits=1))
 #     plt.xlim(xlim)
 #     plt.ylim(ylim)
-    
+
 #     trisurf_T.set_zsort(3)
 #     cliff.set_zsort(2)
 #     trisurf_C.set_zsort(1)
