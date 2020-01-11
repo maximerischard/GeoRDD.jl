@@ -10,7 +10,7 @@ end
 
 residuals(rd::RegionData, β::AbstractVector) = rd.y - rd.D'β
 residuals_data(rd::RegionData, β::AbstractVector) = RegionData(
-        rd.x, 
+        rd.x,
         residuals(rd, β),
         Matrix{Float64}(undef, 0, length(rd.y)), # empty covariates
         rd.shape
@@ -30,8 +30,8 @@ end
 ### Iterate over adjacent regions ###
 #####################################
 
-mutable struct AdjacentIterator{KEY}
-    allpairs::Combinatorics.Combinations{Array{KEY,1}}
+mutable struct AdjacentIterator{KEY,GEN<:Base.Generator{Combinatorics.Combinations}}
+    allpairs::GEN
     rddict::Dict{KEY, RegionData}
     buffer::Float64
 end
@@ -62,10 +62,11 @@ function iterate(adj::AdjacentIterator, state)
 end
 
 function adjacent_pairs(rd_dict::Dict{KEY, RegionData}, buffer::Float64) where {KEY}
-    allpairs = Combinatorics.Combinations(collect(keys(rd_dict)), 2)
-    return AdjacentIterator{KEY}(allpairs, rd_dict, buffer)
+    allpairs = Combinatorics.combinations(collect(keys(rd_dict)), 2)
+    GEN = typeof(allpairs)
+    return AdjacentIterator{KEY,GEN}(allpairs, rd_dict, buffer)
 end
-    
+
 
 ##############################
 ### Parsing GeoRDD Formula ###
@@ -114,7 +115,7 @@ function parse_geordd_formula(fmla::FormulaTerm)
     end
     if !found
         throw("""Error: GP term not found in formula.
-        
+
             The syntax for the formula is
                 Y ~ GP(X1, X2) | Z + COVAR1 + COVAR2 + …
             where Y is the outcome variable, X1 and X2 are the two spatial covariates,
@@ -169,6 +170,6 @@ end
 
 function regions_from_dataframe(fmla::FormulaTerm, df::AbstractDataFrame)
     parsed = parse_geordd_formula(fmla)
-    regions_from_dataframe(df, parsed.outcome, parsed.groupindic, 
+    regions_from_dataframe(df, parsed.outcome, parsed.groupindic,
                           parsed.spatial_covariates, parsed.lmformula)
 end
