@@ -409,14 +409,6 @@ function trisurf_custom_delaunay(grid::Matrix, domain)
         if !LibGEOS.within(centre_LibGEOS, domain)
             continue
         end
-#         a_x, a_y = inverse_x(getx(geta(tri))), inverse_y(gety(geta(tri)))
-#         b_x, b_y = inverse_x(getx(getb(tri))), inverse_y(gety(getb(tri)))
-#         c_x, c_y = inverse_x(getx(getc(tri))), inverse_y(gety(getc(tri)))
-#         tri_geos = LibGEOS.Polygon([[[a_x, a_y], [b_x, b_y], [c_x, c_y], [a_x, a_y]]])
-#         if LibGEOS.area(LibGEOS.intersection(tri_geos, domain)) < (0.9*area)
-#             print("skip area!")
-#             continue
-#         end
         a, b, c = geta(tri), getb(tri), getc(tri)
         ia, ib, ic = get_index(a), get_index(b), get_index(c)
         push!(triangle_indices, (ia-1, ib-1, ic-1)) # python is zero-indexed
@@ -432,9 +424,6 @@ function plot_surface3d(gridT, gridC, gpT, gpC, Xb)
     plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb)
 end
 function plot_cliff(Xb::Matrix, predT_b::Vector, predC_b::Vector)
-    # verts_T = collect(zip(Xb[1,:], Xb[2,:], predT_b.-1e-4))
-    # verts_C = collect(zip(Xb[1,:], Xb[2,:], predC_b.+1e-4))
-    # verts = [verts_T; verts_C[end:-1:1]]
     n_b = length(predT_b)
     cliff = plt.plot_surface([Xb[1,:] Xb[1,:]],
                      [Xb[2,:] Xb[2,:]],
@@ -448,13 +437,6 @@ function plot_cliff(Xb::Matrix, predT_b::Vector, predC_b::Vector)
                      antialiased=false,
                      )
 
-#     polygon = mplot3d.art3d.Poly3DCollection([verts])
-#     polygon.set_color("#AAAAAA")
-#     polygon.set_hatch("///////")
-#     polygon.set_edgecolor("#333333")
-#     polygon.set_linewidth(0)
-#     plt.gca().add_collection3d(polygon)
-#     return polygon
     return cliff
 end
 function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb, regionT, regionC;
@@ -530,10 +512,10 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
     centreT = mean(gridT[:,T_inside]; dims=2)
     maxpredC = maximum(predgridC[C_inside])
     maxpredT = maximum(predgridT[T_inside])
-    plt.text3D(centreC[1], centreC[2], maxpredC, labelC,
-        color="black", fontweight=200, horizontalalignment="left")
-    plt.text3D(centreT[1], centreT[2], maxpredT, labelT,
-        color="black", fontweight=200, horizontalalignment="right")
+    textC = plt.text3D(centreC[1], centreC[2], maxpredC+0.05, labelC,
+        color="black", fontweight=200, horizontalalignment="center", zorder=10)
+    textT = plt.text3D(centreT[1], centreT[2], maxpredT+0.05, labelT,
+        color="black", fontweight=200, horizontalalignment="center", zorder=10)
     ax=plt.gca()
     plt.xlabel("Eastings")
     plt.ylabel("Northings")
@@ -543,19 +525,11 @@ function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb
     ax.set_yticklabels([])
     _zlim = plt.zlim()
     plt.zticks(ceil(_zlim[1]; digits=1):0.2:floor(_zlim[2]; digits=1))
-#     plt.xlim(xlim)
-#     plt.ylim(ylim)
-
-#     trisurf_T.set_zsort(3)
-#     cliff.set_zsort(2)
-#     trisurf_C.set_zsort(1)
-#     lineT.set_sort_zpos(3)
     trisurf_T.set_sort_zpos(4)
     for cliff in cliffs
         cliff.set_sort_zpos(2)
     end
     trisurf_C.set_sort_zpos(1)
-#     lineC.set_sort_zpos(4)
 end
 
 # plotting convenience functions

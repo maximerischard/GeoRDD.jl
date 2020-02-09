@@ -32,8 +32,8 @@ function transform_epsg(coords; epsg_from::Int, epsg_to::Int)
     return transform(proj_from, proj_to, coords)
 end
 
-function read_distr_shapes(; data_dir="NYC_data", epsg_from::Int=4326, epsg_to::Int=2263)
-    nysd_json = GeoJSON.parsefile(joinpath(data_dir, "nysd_16c", "nysd.json"))
+function read_distr_shapes(; filedir="nysd_16c", filename="nysd.json", data_dir="NYC_data", epsg_from::Int=4326, epsg_to::Int=2263)
+    nysd_json = GeoJSON.parsefile(joinpath(data_dir, filedir, filename))
     schdistr_shape_dict = Dict{SchDistr, GeoRDD.RegionType}()
     for feature in features(nysd_json)
         schdistr = convert(SchDistr, properties(feature)["SchoolDist"])
@@ -44,8 +44,8 @@ function read_distr_shapes(; data_dir="NYC_data", epsg_from::Int=4326, epsg_to::
     return schdistr_shape_dict
 end
 
-function read_processed_sales(; data_dir="NYC_data")
-    NYC_sales=CSV.read(joinpath(data_dir, "processed", "NYC_sales.csv"), 
+function read_processed_sales(; filename="NYC_sales.csv", filedir="processed", data_dir="NYC_data")
+    NYC_sales=CSV.read(joinpath(data_dir, filedir, filename),
                        types=Dict("TAX CLASS AT PRESENT" => Union{Missings.Missing, String},
                                   "TAX CLASS AT TIME OF SALE" => Union{Missings.Missing, String}),
                        copycols=true

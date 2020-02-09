@@ -73,6 +73,7 @@ end
 
 fix_alphanumeric_type(x::Real) = (x % 1.0 ≈ 0.0) ? string(Int(x)) : string(x)
 fix_alphanumeric_type(x::String) = string(strip(x))
+fix_alphanumeric_type(x) = string(x) # handle some dates in Apartment Number column
 function read_sales_df(filepath)
     file = ExcelReaders.openxl(filepath)
     sheet1 = file.workbook.sheet_names()[1]
@@ -89,11 +90,11 @@ function read_sales_df(filepath)
                         :TOTAL_UNITS, :RESIDENTIAL_UNITS, :SALE_PRICE, :YEAR_BUILT)
         sales_df[!,zeronullkey] = [x==0 ? missing : x for x in sales_df[!,zeronullkey]]
     end
-    for alphanumkey in (:TAX_CLASS_AT_PRESENT, :APARTMENT_NUMBER)
+    for alphanumkey in (:TAX_CLASS_AT_PRESENT, :TAX_CLASS_AT_TIME_OF_SALE, :APARTMENT_NUMBER)
         sales_df[!,alphanumkey] = fix_alphanumeric_type.(sales_df[!,alphanumkey])
     end
 
-    for (key,dtype) in zip(names(sales_df), eltypes(sales_df))
+    for (key,dtype) in zip(names(sales_df), eltype.(eachcol(sales_df)))
         if dtype <: String
             sales_df[!,key] = String.(strip.(sales_df[!, key]))
         end

@@ -15,6 +15,7 @@ A GeoRDD is a natural experiment where units on one side of a geographical borde
 ## Quick Start
 
 You first need to prepare a [dataframe](https://github.com/JuliaData/DataFrames.jl), for example with columns:
+
 - `X1` and `X2` for the spatial covariates of the units,
 - `outcome` for the outcome of interest
 - `region` giving the treatment indicator (for example containing strings "treatment" and "control")
