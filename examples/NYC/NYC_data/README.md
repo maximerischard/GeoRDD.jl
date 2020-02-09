@@ -1,12 +1,42 @@
 # Sales data:
-> The Department of Finance’s Rolling Sales files lists properties that sold in the last twelve-month period in New York City for all tax classes. These files include:
+
+The Department of Finance’s Rolling Sales files lists properties that sold in the last twelve-month period in New York City for all tax classes. These files include:
+
 * the neighborhood;
 * building type;
 * square footage;
 * other data.
-Download from http://www1.nyc.gov/site/finance/taxes/property-rolling-sales-data.page
-These are provided in the `raw_data` directory. The data used in the manuscript
-was downloaded on 15 Sept. 2019 and is available in `raw_data/2016`.
+
+Download from (https://www1.nyc.gov/site/finance/taxes/property-annualized-sales-update.page)
+These are provided in the `raw_data` directory. The data used in the manuscript is available in `raw_data/2016`.
+
+## preprocessing the raw data
+
+```bash
+julia NYC_dataprep.jl --sales=NYC_data/raw_data/2015/2015_bronx.xls \
+                      --sales=NYC_data/raw_data/2015/2015_brooklyn.xls \
+                      --sales=NYC_data/raw_data/2015/2015_manhattan.xls \
+                      --sales=NYC_data/raw_data/2015/2015_queens.xls \
+                      --condos=NYC_data/DTM_Condo_Units.dbf \
+                      --parcels=NYC_data/NYC-Tax-Parcels-Centroid-Points-SHP/Bronx_2018_Tax_Parcel_Centroid_Points_SHP.shp \
+                      --parcels=NYC_data/NYC-Tax-Parcels-Centroid-Points-SHP/Kings_2018_Tax_Parcel_Centroid_Points_SHP.shp \
+                      --parcels=NYC_data/NYC-Tax-Parcels-Centroid-Points-SHP/NewYork_2018_Tax_Parcel_Centroid_Points_SHP.shp \
+                      --parcels=NYC_data/NYC-Tax-Parcels-Centroid-Points-SHP/Queens_2018_Tax_Parcel_Centroid_Points_SHP.shp \
+                      > NYC_data/processed/NYC_sales_2015.csv
+```
+
+```bash
+julia NYC_dataprep.jl --sales=NYC_data/raw_data/2016/2016_bronx.xls \
+                      --sales=NYC_data/raw_data/2016/2016_brooklyn.xls \
+                      --sales=NYC_data/raw_data/2016/2016_manhattan.xls \
+                      --sales=NYC_data/raw_data/2016/2016_queens.xls \
+                      --condos=NYC_data/DTM_Condo_Units.dbf \
+                      --parcels=NYC_data/NYC-Tax-Parcels-Centroid-Points-SHP/Bronx_2018_Tax_Parcel_Centroid_Points_SHP.shp \
+                      --parcels=NYC_data/NYC-Tax-Parcels-Centroid-Points-SHP/Kings_2018_Tax_Parcel_Centroid_Points_SHP.shp \
+                      --parcels=NYC_data/NYC-Tax-Parcels-Centroid-Points-SHP/NewYork_2018_Tax_Parcel_Centroid_Points_SHP.shp \
+                      --parcels=NYC_data/NYC-Tax-Parcels-Centroid-Points-SHP/Queens_2018_Tax_Parcel_Centroid_Points_SHP.shp \
+                      > NYC_data/processed/NYC_sales_2016.csv
+```
 
 # School district boundaries
 
