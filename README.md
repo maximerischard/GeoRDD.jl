@@ -40,7 +40,7 @@ jupyter notebook for a step-by-step example of how to
 perform the GeoRDD analysis.
 If you run into any trouble, please open a GitHub issue.
 
-For a more complete example using real data, see [`notebooks/NYC_analysis.ipynb`](notebooks/NYC_analysis.ipynb), which reproduces the example in the paper of estimating the difference in house prices between school districts in NYC.
+For a more complete example using real data, see [`notebooks/NYC_analysis-2015.ipynb`](notebooks/NYC_analysis-2015.ipynb), which reproduces the example in the paper of estimating the difference in house prices between school districts in NYC.
 
 ## Reproducibility
 
@@ -50,9 +50,9 @@ The table below indicates which notebook each figure was generated in.
 
 | #   | File Name                      | Notebook                            | Short Caption                                                                                                                       |
 |-----|--------------------------------|-------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| 1   | sales_map                      | NYC_analysis                        | A map of sales in NYC color-coded by sale price per square foot.                                                                    |
-| 2   | NYC_cliff_face                 | NYC_analysis                        | Estimate of the difference in log prices per square foot at the border between school districts 19 and 27.                          |
-| 3   | placebo_invvar                 | NYC_analysis                        | Distribution of the placebo p-values for the inverse-variance weighted significance test.                                           |
+| 1   | sales_map                      | NYC_analysis-2015                        | A map of sales in NYC color-coded by sale price per square foot.                                                                    |
+| 2   | NYC_cliff_face                 | NYC_analysis-2015                        | Estimate of the difference in log prices per square foot at the border between school districts 19 and 27.                          |
+| 3   | placebo_invvar                 | NYC_analysis-2015                        | Distribution of the placebo p-values for the inverse-variance weighted significance test.                                           |
 | S-1 | confounding                    | (drawn in a vector graphics editor) | Illustration of the confounding due to spatial variation in the projected 1D RDD method.                                            |
 | S-2 | mississippi_projection_methods | Mississippi_projection_illustration | Illustration of the projected finite-population and projected-land local average treatment effect estimators.                       |
 | S-3 | wiggly_boundaries_setup        | Wiggly Boundaries                   | Setup of the wiggly boundaries simulations.                                                                                         |
