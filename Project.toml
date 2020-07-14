@@ -2,3 +2,31 @@ name = "GeoRDD"
 uuid = "35839c05-076b-4ef8-bdba-2199c48afeaa"
 authors = ["maximerischard <rischardmaxime@gmail.com>"]
 version = "0.1.0"
+
+[deps]
+Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+DocOpt = "968ba79b-81e4-546f-ab3a-2eecfa62a9db"
+GaussianProcesses = "891a1506-143c-57d2-908e-e1f8e92e6de9"
+GeoInterface = "cf35fbd7-0cd7-5166-be24-54bfbe79505f"
+LibGEOS = "a90b1aa1-3769-5649-ba7e-abc5a9d163eb"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NLopt = "76087f3c-5699-56af-9a33-bf431cd00edd"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+PDMats = "90014a1f-27ba-587c-ab20-58faa44d9150"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StatsModels = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
+
+[compat]
+GaussianProcesses = "0.11"
+Optim = "0.19.7"
+julia = "1"
+
+[extras]
+Calculus = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test", "Calculus", "Random"]
