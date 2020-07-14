@@ -13,7 +13,7 @@ These are provided in the `raw_data` directory. The data used in the manuscript 
 ## preprocessing the raw data
 
 ```bash
-julia NYC_dataprep.jl --sales=NYC_data/raw_data/2015/2015_bronx.xls \
+julia --project=Project.toml NYC_dataprep.jl --sales=NYC_data/raw_data/2015/2015_bronx.xls \
                       --sales=NYC_data/raw_data/2015/2015_brooklyn.xls \
                       --sales=NYC_data/raw_data/2015/2015_manhattan.xls \
                       --sales=NYC_data/raw_data/2015/2015_queens.xls \
@@ -26,7 +26,7 @@ julia NYC_dataprep.jl --sales=NYC_data/raw_data/2015/2015_bronx.xls \
 ```
 
 ```bash
-julia NYC_dataprep.jl --sales=NYC_data/raw_data/2016/2016_bronx.xls \
+julia --project=Project.toml" NYC_dataprep.jl --sales=NYC_data/raw_data/2016/2016_bronx.xls \
                       --sales=NYC_data/raw_data/2016/2016_brooklyn.xls \
                       --sales=NYC_data/raw_data/2016/2016_manhattan.xls \
                       --sales=NYC_data/raw_data/2016/2016_queens.xls \

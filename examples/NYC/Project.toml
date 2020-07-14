@@ -1,0 +1,13 @@
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DBFTables = "75c7ada1-017a-5fb6-b8c7-2125ff2d6c93"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+DocOpt = "968ba79b-81e4-546f-ab3a-2eecfa62a9db"
+ExcelFiles = "89b67f3b-d1aa-5f6f-9ca4-282e8d98620d"
+ExcelReaders = "c04bee98-12a5-510c-87df-2a230cb6e075"
+GeoInterface = "cf35fbd7-0cd7-5166-be24-54bfbe79505f"
+GeoRDD = "35839c05-076b-4ef8-bdba-2199c48afeaa"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Proj4 = "9a7e659c-8ee8-5706-894e-f68f43bc57ea"
+Shapefile = "8e980c4a-a4fe-5da2-b3a7-4b4b0353a2f4"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
