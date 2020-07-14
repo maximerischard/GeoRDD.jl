@@ -1,0 +1,4 @@
+name = "GeoRDD"
+uuid = "35839c05-076b-4ef8-bdba-2199c48afeaa"
+authors = ["maximerischard <rischardmaxime@gmail.com>"]
+version = "0.1.0"
