@@ -8,13 +8,10 @@ import PyPlot; plt=PyPlot
 cbbPalette = ["#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
 # using ..NYC: read_distr_reprpoints
 using Distributions: MultivariateNormal
-import GeometricalPredicates
-using VoronoiDelaunay
-import VoronoiDelaunay: getx, gety, DelaunayEdge, DelaunayTriangle
 using Statistics: mean
-
+using GaussianProcesses: predict_f
 using PyCall
-mplot3d = pyimport("mpl_toolkits.mplot3d")
+# mplot3d = pyimport("mpl_toolkits.mplot3d")
 
 function plot_polygon(poly_coords, facecolor, alpha;
                       edgecolor="none", linestyle="None", linewidth=0.0, kwargs...)
@@ -352,186 +349,6 @@ function plot_cliffface(μ, Σ, color; ndraws::Int=10, label=L"posterior of $\ta
     plt.sca(ax)
 end
 
-##########################################
-####### 3D plot ##########################
-##########################################
-
-struct IndexablePoint <: AbstractPoint2D
-    _x::Float64
-    _y::Float64
-    index::Int64
-end
-getx(p::IndexablePoint) = p._x
-gety(p::IndexablePoint) = p._y
-get_index(p::IndexablePoint) = p.index
-IndexablePoint(x::Float64, y::Float64) = IndexablePoint(x, y, -1)
-
-function trisurf_custom_delaunay(grid::Matrix, domain)
-    # create Delaynay
-    tess = DelaunayTessellation2D{IndexablePoint}()
-    minx, maxx = extrema(grid[1,:])
-    xwidth = maxx-minx
-    miny, maxy = extrema(grid[2,:])
-    ywidth = maxy-miny
-    delaunay_width = VoronoiDelaunay.max_coord - VoronoiDelaunay.min_coord
-    min_coord = VoronoiDelaunay.min_coord
-    transform_x = x -> (x-minx) / xwidth * (delaunay_width) + min_coord
-    inverse_x = x -> (x - min_coord) / delaunay_width * xwidth + minx
-    transform_y = y -> (y-miny) / ywidth * (delaunay_width) + min_coord
-    inverse_y = y -> (y - min_coord) / delaunay_width * ywidth + miny
-
-    points = [IndexablePoint(transform_x(grid[1,i]), transform_y(grid[2,i]), i) for i in 1:size(grid,2)]
-    push!(tess, points)
-
-    # get minimum triangle areas
-    areas = Float64[]
-    centres = LibGEOS.Point[]
-    for tri in tess
-        area = GeometricalPredicates.area(tri)
-        centre = GeometricalPredicates.centroid(tri)
-        centre_LibGEOS = LibGEOS.Point(inverse_x(getx(centre)), inverse_y(gety(centre)))
-        push!(centres, centre_LibGEOS)
-        push!(areas, area)
-    end
-    medarea = median(areas)
-
-    # build up triangle indices
-    triangle_indices = Tuple{Int,Int,Int}[]
-    for tri in tess
-        area = GeometricalPredicates.area(tri)
-        if area > 2*medarea
-            # skip triangles that are too big
-            continue
-        end
-
-        centre = GeometricalPredicates.centroid(tri)
-        centre_LibGEOS = LibGEOS.Point(inverse_x(getx(centre)), inverse_y(gety(centre)))
-        if !LibGEOS.within(centre_LibGEOS, domain)
-            continue
-        end
-        a, b, c = geta(tri), getb(tri), getc(tri)
-        ia, ib, ic = get_index(a), get_index(b), get_index(c)
-        push!(triangle_indices, (ia-1, ib-1, ic-1)) # python is zero-indexed
-    end
-    return triangle_indices
-end
-
-function plot_surface3d(gridT, gridC, gpT, gpC, Xb)
-    predgridT=GaussianProcesses.predict(gpT, gridT; full_cov=false)
-    predgridC=GaussianProcesses.predict(gpC, gridC; full_cov=false)
-    predT_b = GaussianProcesses.predict(gpT, Xb; full_cov=false)
-    predC_b = GaussianProcesses.predict(gpC, Xb; full_cov=false)
-    plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb)
-end
-function plot_cliff(Xb::Matrix, predT_b::Vector, predC_b::Vector)
-    n_b = length(predT_b)
-    cliff = plt.plot_surface([Xb[1,:] Xb[1,:]],
-                     [Xb[2,:] Xb[2,:]],
-                     [(predT_b.-0.001) (predC_b.+0.001)],
-#                      [(ones(n_b)*5.0) (ones(n_b)*5.7)],
-                     shade=true,
-                     color="#BBBBBB",
-                     rstride=1,
-                     cstride=1,
-                     linewidth=0,
-                     antialiased=false,
-                     )
-
-    return cliff
-end
-function plot_surface3d(gridT, gridC, predgridT, predgridC, predT_b, predC_b, Xb, regionT, regionC;
-                        xlim=(-Inf, Inf), ylim=(-Inf, Inf), labelT="", labelC="")
-    trisurf_X = vcat(@view(gridT[1,:]), @view(gridC[1,:]))
-    trisurf_Y = vcat(@view(gridT[2,:]), @view(gridC[2,:]))
-    trisurf_Z = vcat(predgridT, predgridC)
-
-    bX_inside = xlim[1] .<= Xb[1,:] .<= xlim[2]
-    bY_inside = ylim[1] .<= Xb[2,:] .<= ylim[2]
-    b_inside = bX_inside .& bY_inside
-    Xb_inside = Xb[:, b_inside]
-
-    min_b = min(minimum(predT_b[b_inside]),minimum(predC_b[b_inside])) - 0.1
-    max_b = max(maximum(predT_b[b_inside]),maximum(predC_b[b_inside])) + 0.1
-
-    TX_inside = xlim[1] .<= gridT[1,:] .<= xlim[2]
-    TY_inside = ylim[1] .<= gridT[2,:] .<= ylim[2]
-    T_inside = TX_inside .& TY_inside
-
-    gridT_augmented = hcat(@view(gridT[:,T_inside]), @view(Xb[:,b_inside]))
-    trianglesT = trisurf_custom_delaunay(gridT_augmented, regionT)
-    trisurf_T = plt.plot_trisurf(
-       [gridT[1,T_inside]; Xb[1,b_inside]],
-       [gridT[2,T_inside]; Xb[2,b_inside]],
-       [predgridT[T_inside]; predT_b[b_inside]],
-       triangles=trianglesT,
-       linewidth=0,
-       cmap=plt.cm_get_cmap("jet"),
-       vmin=min_b,
-       vmax=max_b,
-       alpha=1.0
-       )
-
-    CX_inside = xlim[1] .<= gridC[1,:] .<= xlim[2]
-    CY_inside = ylim[1] .<= gridC[2,:] .<= ylim[2]
-    C_inside = CX_inside .& CY_inside
-    gridC_augmented = hcat(@view(gridC[:,C_inside]), @view(Xb[:,b_inside]))
-    trianglesC = trisurf_custom_delaunay(gridC_augmented, regionC)
-    trisurf_C = plt.plot_trisurf(
-       [gridC[1,C_inside]; Xb[1,b_inside]],
-       [gridC[2,C_inside]; Xb[2,b_inside]],
-       [predgridC[C_inside]; predC_b[b_inside]],
-       triangles=trianglesC,
-       linewidth=0,
-       antialiased=false,
-       edgecolor="none",
-       cmap=plt.cm_get_cmap("jet"),
-       vmin=min_b,
-       vmax=max_b,
-       alpha=1.0
-       )
-
-    distances = .√(diff(Xb_inside[1,:]).^2 + diff(Xb_inside[2,:]).^2)
-    med_dist = median(distances)
-    breakpoints = findall(distances .> (2*med_dist))
-    push!(breakpoints, length(distances)+1)
-    cliffs = []
-    seg_start=1
-    for isegment in 1:length(breakpoints)
-        seg_end = breakpoints[isegment]
-        seg_indices = seg_start:seg_end
-        if length(seg_indices) > 2
-            cliff = plot_cliff(Xb_inside[:,seg_indices],
-                               predT_b[b_inside][seg_indices],
-                               predC_b[b_inside][seg_indices])
-            push!(cliffs, cliff)
-        end
-        seg_start = seg_end + 1
-    end
-
-    centreC = mean(gridC[:,C_inside]; dims=2)
-    centreT = mean(gridT[:,T_inside]; dims=2)
-    maxpredC = maximum(predgridC[C_inside])
-    maxpredT = maximum(predgridT[T_inside])
-    textC = plt.text3D(centreC[1], centreC[2], maxpredC+0.05, labelC,
-        color="black", fontweight=200, horizontalalignment="center", zorder=10)
-    textT = plt.text3D(centreT[1], centreT[2], maxpredT+0.05, labelT,
-        color="black", fontweight=200, horizontalalignment="center", zorder=10)
-    ax=plt.gca()
-    plt.xlabel("Eastings")
-    plt.ylabel("Northings")
-    plt.zlabel("log Price per SQFT")
-    ax.view_init(elev=60, azim=230)
-    ax.set_xticklabels([])
-    ax.set_yticklabels([])
-    _zlim = plt.zlim()
-    plt.zticks(ceil(_zlim[1]; digits=1):0.2:floor(_zlim[2]; digits=1))
-    trisurf_T.set_sort_zpos(4)
-    for cliff in cliffs
-        cliff.set_sort_zpos(2)
-    end
-    trisurf_C.set_sort_zpos(1)
-end
-
 # plotting convenience functions
 function yaxis_right()
     ax = plt.gca()
@@ -557,3 +374,33 @@ function hide_xaxis()
     plt.gca().xaxis.set_ticklabels([])
     plt.xlabel("")
 end
+function pval_yticks()
+    ax = plt.gca()
+    plt.ylim(0,1)
+    ax.set_yticks(0:0.1:1, minor=true)
+    ax.set_yticks(0:0.2:1, minor=false)
+end
+
+# NYC_dir is GeoRDD/examples/NYC and is expected to be defined
+# in the module that loads this file
+NYSD_FILENAME = joinpath(NYC_dir, "NYC_data/nysd_16c/nysd.json")
+py"""
+import matplotlib.pyplot as plt
+import pandas as pd
+import geopandas as gpd
+plot_dataframe = gpd.plotting.plot_dataframe
+import numpy as np
+import itertools
+plt.interactive(False)
+
+EPSG=2263 # projection
+# import os
+# dirname = os.path.dirname(__file__)
+# nysd_filename = os.path.join(dirname, "NYC_data/nysd_16c/nysd.json")
+nycdistrs=gpd.read_file($(NYSD_FILENAME)).to_crs(epsg=EPSG)
+
+def background_schdistrs(ax, **kwargs):
+    plot_dataframe(nycdistrs, ax=ax, **kwargs)
+    return None
+"""
+background_schdistrs = py"background_schdistrs"
