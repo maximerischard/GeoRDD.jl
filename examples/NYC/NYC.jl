@@ -33,7 +33,7 @@ function transform_epsg(coords; epsg_from::Int, epsg_to::Int)
 end
 
 function read_distr_shapes(; filedir="nysd_16c", filename="nysd.json", data_dir="NYC_data", epsg_from::Int=4326, epsg_to::Int=2263)
-    nysd_json = GeoJSON.parsefile(joinpath(data_dir, filedir, filename))
+    nysd_json = GeoJSON.read(read(joinpath(data_dir, filedir, filename)))
     schdistr_shape_dict = Dict{SchDistr, GeoRDD.RegionType}()
     for feature in features(nysd_json)
         schdistr = convert(SchDistr, properties(feature)["SchoolDist"])

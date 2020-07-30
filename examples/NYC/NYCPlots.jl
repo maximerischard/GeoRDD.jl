@@ -165,8 +165,8 @@ function plot_streets(;zoom=11, brighten=30, rgb=(200, 200, 200), zorder=-9)
     import PIL.Image as _Image
 
     def bounds(plotter, epsg):
-        epsg_proj = pyproj.Proj(init='epsg:%d' % epsg, preserve_units=True)
-        epsg_3857 = pyproj.Proj(init='epsg:%d' % tilemapbase.mapping._WEB_MERCATOR)
+        epsg_proj = pyproj.Proj('epsg:%d' % epsg, preserve_units=True)
+        epsg_3857 = pyproj.Proj('epsg:%d' % tilemapbase.mapping._WEB_MERCATOR)
         self = plotter
         scale = 2 ** self.zoom
         x0, y0 = self.xtilemin / scale, self.ytilemin / scale # in tile space
