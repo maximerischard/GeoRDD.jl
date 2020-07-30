@@ -1,4 +1,7 @@
-function inverse_variance(μ::AbstractVector, Σ::M) where {M<:Union{AbstractMatrix,AbstractPDMat}}
+add_nugget(A, nugget) = A + Diagonal(nugget*I, size(A, 1))
+add_nugget(A::PDMat, nugget) = A # no need, it's already positive definite
+function inverse_variance(μ::AbstractVector, Σ::M; nugget=1e-10) where {M<:Union{AbstractMatrix,AbstractPDMat}}
+    Σ = add_nugget(Σ, nugget)
     n = size(μ)
     denom = sum(Σ \ ones(n))
     τhat = sum(Σ \ μ) / denom
