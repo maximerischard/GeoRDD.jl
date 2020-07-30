@@ -8,7 +8,7 @@ The Department of Finance’s Rolling Sales files lists properties that sold in 
 * other data.
 
 Download from (https://www1.nyc.gov/site/finance/taxes/property-annualized-sales-update.page)
-These are provided in the `raw_data` directory. The data used in the manuscript is available in `raw_data/2016`.
+These are provided in the `raw_data` directory. The data used in the manuscript is available in `raw_data/2015`.
 
 ## preprocessing the raw data
 
