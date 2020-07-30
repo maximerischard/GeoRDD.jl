@@ -44,15 +44,15 @@ For a more complete example using real data, see [`notebooks/NYC_analysis-2015.i
 
 ## Reproducibility
 
-The figures in the manuscript and supplementary materials are generated in notebooks, so they are fully reproducible.
+The figures in the paper and supplementary materials are generated in notebooks, so they are fully reproducible.
+In each notebook, the first cell downloads and installs the versions of the julia package dependencies that were used for the paper's analysis.
 The table below indicates which notebook each figure was generated in.
 
 
 | #   | File Name                      | Notebook                            | Short Caption                                                                                                                       |
 |-----|--------------------------------|-------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| 1   | sales_map                      | NYC_analysis-2015                        | A map of sales in NYC color-coded by sale price per square foot.                                                                    |
+| 1 | NYC_pairwise_mean_se               | NYC_analysis-2015                        | Map of NYC showing the property sales and estimates of the inverse-variance weighted local average treatment effect between pairs of school districts. |
 | 2   | NYC_cliff_face                 | NYC_analysis-2015                        | Estimate of the difference in log prices per square foot at the border between school districts 19 and 27.                          |
-| 3   | placebo_invvar                 | NYC_analysis-2015                        | Distribution of the placebo p-values for the inverse-variance weighted significance test.                                           |
 | S-1 | confounding                    | (drawn in a vector graphics editor) | Illustration of the confounding due to spatial variation in the projected 1D RDD method.                                            |
 | S-2 | mississippi_projection_methods | Mississippi_projection_illustration | Illustration of the projected finite-population and projected-land local average treatment effect estimators.                       |
 | S-3 | wiggly_boundaries_setup        | Wiggly Boundaries                   | Setup of the wiggly boundaries simulations.                                                                                         |
@@ -60,5 +60,4 @@ The table below indicates which notebook each figure was generated in.
 | S-5 | weight_functions               | Wiggly Boundaries                   | Illustration showing the behavior of the border and unit weight functions for each local average treatment estimator.               |
 | S-6 | mississippi_sim                | Mississippi_sharp_null_sims         | Set-up of an imaginary experiment at the Louisiana-Mississippi border                                                               |
 | S-7 | NYC_placebos                   | NYC analysis                        | Placebo tests for additional significance tests.                                                                                    |
-| S-8 | pairwise_mean_se               | NYC analysis                        | Map of NYC showing the estimates of the inverse-variance weighted local average treatment effect between pairs of school districts. |
 
