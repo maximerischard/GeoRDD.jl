@@ -12,6 +12,10 @@ This julia package implements the methods introduced in the paper **“A Bayesia
 
 A GeoRDD is a natural experiment where units on one side of a geographical border are given a treatment while units on the other side are not. It's the spatial analog of univariate RDDs, which are an increasingly popular tool in econometrics and other social sciences.
 
+## Installation
+
+The package is currently not registered, so it has to be installed with a direct link to github. This can be accomplished by running `import Pkg; Pkg.add("https://github.com/maximerischard/GeoRDD.jl.git")` (or `add https://github.com/maximerischard/GeoRDD.jl.git` from the [Pkg REPL](https://docs.julialang.org/en/v1/stdlib/Pkg/)).
+
 ## Quick Start
 
 You first need to prepare a [dataframe](https://github.com/JuliaData/DataFrames.jl), for example with columns:
